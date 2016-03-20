@@ -40,7 +40,7 @@ setup(
         long_description=long_description,
 
         # The project's main homepage.
-        url='',
+        url='http://manifest-checker.readthedocs.org/en/latest/',
 
         # Author details
         author='Tony Flury',
