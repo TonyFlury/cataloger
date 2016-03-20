@@ -31,7 +31,7 @@
 
   
     <link rel="top" title="manifest-checker 0.0.1 documentation" href="index.html"/>
-        <link rel="next" title="Command Line Options" href="CommandLineOptions.html"/>
+        <link rel="next" title="Defaults" href="Defaults.html"/>
         <link rel="prev" title="Manifest Checker" href="index.html"/> 
 
   
@@ -83,6 +83,7 @@
             
                 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Defaults.html">Defaults</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CommandLineOptions.html">Command Line Options</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ConfigurationFiles.html">Configuration Files</a></li>
 <li class="toctree-l1"><a class="reference internal" href="ExtraInfo.html">Extra Information</a></li>
@@ -132,7 +133,28 @@
             
   <div class="section" id="getting-started">
 <h1>Getting Started<a class="headerlink" href="#getting-started" title="Permalink to this headline">¶</a></h1>
-<p>This page will contain information about how to use the manifest checker suite in it&#8217;s default form</p>
+<p>Using the Manifest checker suite with the default arguments is easy :</p>
+<p>To create the manifest</p>
+<div class="highlight-bash"><div class="highlight"><pre><span class="nv">$ </span><span class="nb">cd</span> &lt;tree root&gt;
+<span class="nv">$ </span>manifest create
+</pre></div>
+</div>
+<p>This will create a manifest.txt - detailing all the source code files in the current directory tree, with a sha224 hash created for each file. You can then deploy/copy your source code to the destination and execute</p>
+<div class="highlight-bash"><div class="highlight"><pre><span class="nv">$ </span><span class="nb">cd</span> &lt;tree root&gt;
+<span class="nv">$ </span>manifest check
+</pre></div>
+</div>
+<p>The check subcommand rescursively searches the directory tree under the current directory, and computes the hash for each file - and compares that against the computed has in the manifest file.</p>
+<div class="admonition note">
+<p class="first admonition-title">Note</p>
+<p class="last">Make sure you copy/deploy your manifest.txt file along with your source code - if you don&#8217;t the <code class="docutils literal"><span class="pre">manifest</span> <span class="pre">check</span></code> will fail at the first attempt.</p>
+</div>
+<p>By default the <code class="docutils literal"><span class="pre">manifest</span> <span class="pre">check</span></code> will detect and report on three different types of issue :</p>
+<ul class="simple">
+<li>missing files : files listed in the manifest file, but which don&#8217;t exist in the local directory tree.</li>
+<li>extra files : files which are not listed in the manifest file, but which exist in the local directory tree.</li>
+<li>incorrect hashes : files where there is a discrepancy between the hash created for the local file, and the hash listed in the manifest.</li>
+</ul>
 </div>
 
 
@@ -142,7 +164,7 @@
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="CommandLineOptions.html" class="btn btn-neutral float-right" title="Command Line Options" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="Defaults.html" class="btn btn-neutral float-right" title="Defaults" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
         <a href="index.html" class="btn btn-neutral" title="Manifest Checker" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>

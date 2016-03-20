@@ -27,6 +27,7 @@ If you special configuration options on the command line to create your manifest
     :maxdepth: 2
 
     GettingStarted
+    Defaults
     CommandLineOptions
     ConfigurationFiles
     ExtraInfo
