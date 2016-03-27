@@ -2,19 +2,27 @@
 Manifest Checker
 ================
 
+.. image:: https://readthedocs.org/projects/manifest-checker/badge/?version=latest
+
+:target: http://manifest-checker.readthedocs.org/en/latest/?badge=latest
+
+:alt: Documentation Status
+
 The manifest checker is a suite of easy to use tools which are intended to be used confirm that a directory tree has been correctly copied/deployed.
 
-The checker builds a manifest file, with a checksum against each file. The manifest file is then then copied/deployed along with the rest of the directory tree - and the destination tree can be checked against the manifest.
+The checker builds a manifest file, with a checksum against each file. The manifest file is then copied/deployed along with the rest of the directory tree - and the suite can be used to check the destination tree against the manifest.
 
-By Default the checker will report against :
+During the check phase - the suite will report against :
 
-- files which have different checksums in the destination directory tree
-- files which are missing from the destination directory tree
-- files which exist in the destination tree but which are missing from the manifest.
+- files which have different checksums in the destination directory tree compared to manifest file - i.e. the files are likely to be different.
+- files which are missing from the destination directory tree but which have a checksum within the manifest file - i.e. files which haven't been deployed at all.
+- files which exist in the destination tree but which are missing from the manifest file - these extra files may impact the behaviour of the deployed code.
 
-The manifest checker has default options which are ideal for checking deployment of a Django deployment, but it can be configured either by the command line, or via a configuration file to look in other places, or other file types, or even specific file names.
+These are called exceptions - and using the right command options you can control which exception result in failures
 
-If you special configuration options on the command line to create your manifest, then you will need to ensure that you use the same options when you execute the checker against your destination, to ensure that the right files are checked. If you use the configuration file you will need to ensure that the configuration file is copied/deployed for the checker to work correctly.
+The manifest checker has :doc:`default options </Defaults>` which are ideal for checking deployment of a Django deployment, but it can be configured either by command line to look in other places, or other file types.
+
+If you use non default configuration options on the command line to create your manifest, then you will need to ensure that you use the same options when you execute the checker against your destination, to ensure that the right files are checked.
 
 .. note::
   Every care is taken to try to ensure that this code comes to you bug free.
@@ -23,14 +31,16 @@ If you special configuration options on the command line to create your manifest
     - `GitHub Issues`_
     - By email to : `Tony Flury`_
 
+
 .. toctree::
     :maxdepth: 2
 
     GettingStarted
-    Defaults
     CommandLineOptions
-    ConfigurationFiles
-    ExtraInfo
+    Defaults
+
+
 
 .. _Github Issues: https://github.com/TonyFlury/manifest-checker/issues/new
 .. _Tony Flury : mailto:anthony.flury?Subject=manifest-checker%20Error
+.. _default options: :doc:`Defaults`
