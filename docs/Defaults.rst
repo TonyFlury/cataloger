@@ -9,10 +9,10 @@ If you don't use Django, you can still use the manifest suite to check your copi
 - ignoring different directories
 
 File Extension
-        [u'.py', u'.html', u'.txt', u'.css', u'.js', u'.gif', u'.png', u'.jpg', u'.jpeg']
+        .py, .html, .txt, .css, .js, .gif, .png, .jpg, .jpeg
 
 Top Level directories which are ignored :
-    [u'static', u'env', u'htmlcov', u'media',u'build', u'dist', u'docs']
+    static, env, htmlcov, media,build, dist, docs
 
 Default manifest file
     'manifest.txt'
