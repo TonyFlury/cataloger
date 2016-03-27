@@ -8,7 +8,7 @@ Manifest Checker
 
 :alt: Documentation Status
 
-The manifest checker is a suite of easy to use tools which are intended to be used confirm that a directory tree has been correctly copied/deployed.
+The manifest checker is a suite of easy to use tools which can be used confirm that a directory tree has been correctly copied/deployed.
 
 The checker builds a manifest file, with a checksum against each file. The manifest file is then copied/deployed along with the rest of the directory tree - and the suite can be used to check the destination tree against the manifest.
 
@@ -35,7 +35,6 @@ If you use non default configuration options on the command line to create your 
 .. toctree::
     :maxdepth: 2
 
-    index
     GettingStarted
     CommandLineOptions
     Defaults
