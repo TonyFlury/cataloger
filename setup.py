@@ -34,7 +34,7 @@ setup(
         # Versions should comply with PEP440.  For a discussion on single-sourcing
         # the version across setup.py and the project code, see
         # https://packaging.python.org/en/latest/single_source_version.html
-        version="0.0.1a1$",
+        version="0.0.2rc1",
 
         description='Simple to use tools to create and check directory contents - ideal for integrity checking',
         long_description=long_description,
@@ -55,11 +55,13 @@ setup(
             #   3 - Alpha
             #   4 - Beta
             #   5 - Production/Stable
-            'Development Status :: 3 - Alpha',
+            'Development Status :: 4 - Beta',
 
             # Indicate who your project is intended for
             'Intended Audience :: Developers',
-            'Development',
+            'Framework :: Django',
+            'Natural Language :: English',
+            'Topic :: Software Development :: Quality Assurance',
 
             # Pick your license as you wish (should match "license" above)
             'License :: OSI Approved :: GNU General Public License (GPL)',
@@ -76,7 +78,7 @@ setup(
         ],
 
         # What does your project relate to?
-        keywords='Development, Deployment',
+        keywords='Development, Deployment, Integrity Checking',
 
         # You can just specify the packages manually here if your project is
         # simple. Or you can use find_packages().
@@ -86,7 +88,7 @@ setup(
         # your project is installed. For an analysis of "install_requires" vs pip's
         # requirements files see:
         # https://packaging.python.org/en/latest/requirements.html
-        install_requires=[''],
+        install_requires=['Click'],
 
         include_package_data=True,
 
@@ -116,5 +118,6 @@ setup(
         # "scripts" keyword. Entry points provide cross-platform support and allow
         # pip to create the appropriate form of executable for the target platform.
         entry_points={
+        'console_scripts' : ['manifest=manifest_checker.main:main']
         },
 )
