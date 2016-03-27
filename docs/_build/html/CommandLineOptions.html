@@ -1,0 +1,288 @@
+
+
+<!DOCTYPE html>
+<!--[if IE 8]><html class="no-js lt-ie9" lang="en" > <![endif]-->
+<!--[if gt IE 8]><!--> <html class="no-js" lang="en" > <!--<![endif]-->
+<head>
+  <meta charset="utf-8">
+  
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  
+  <title>Command Line Options &mdash; manifest-checker 0.0.1 documentation</title>
+  
+
+  
+  
+
+  
+
+  
+  
+    
+
+  
+
+  
+  
+    <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  
+
+  
+
+  
+    <link rel="top" title="manifest-checker 0.0.1 documentation" href="index.html"/>
+        <link rel="next" title="Defaults" href="Defaults.html"/>
+        <link rel="prev" title="Getting Started" href="GettingStarted.html"/> 
+
+  
+  <script src="_static/js/modernizr.min.js"></script>
+
+</head>
+
+<body class="wy-body-for-nav" role="document">
+
+  <div class="wy-grid-for-nav">
+
+    
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search">
+          
+
+          
+            <a href="index.html" class="icon icon-home"> manifest-checker
+          
+
+          
+          </a>
+
+          
+            
+            
+              <div class="version">
+                0.0.1
+              </div>
+            
+          
+
+          
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+
+          
+        </div>
+
+        <div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="main navigation">
+          
+            
+            
+                <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="GettingStarted.html">Getting Started</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="">Command Line Options</a></li>
+<li class="toctree-l1"><a class="reference internal" href="Defaults.html">Defaults</a></li>
+</ul>
+
+            
+          
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap">
+
+      
+      <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
+        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+        <a href="index.html">manifest-checker</a>
+      </nav>
+
+
+      
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          
+
+
+
+
+
+<div role="navigation" aria-label="breadcrumbs navigation">
+  <ul class="wy-breadcrumbs">
+    <li><a href="index.html">Docs</a> &raquo;</li>
+      
+    <li>Command Line Options</li>
+      <li class="wy-breadcrumbs-aside">
+        
+          
+            <a href="_sources/CommandLineOptions.txt" rel="nofollow"> View page source</a>
+          
+        
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+            
+  <div class="section" id="command-line-options">
+<h1>Command Line Options<a class="headerlink" href="#command-line-options" title="Permalink to this headline">¶</a></h1>
+<p>The full command with options is :</p>
+<div class="highlight-bash"><div class="highlight"><pre>manifest <span class="o">[</span>-h<span class="o">]</span> <span class="o">[</span>-v, --verbose <span class="o">{</span>0,1,2,3<span class="o">}]</span>
+                <span class="o">[</span>-r,--root ROOT<span class="o">]</span>
+                <span class="o">[</span>-o,--out REPORT-OUT<span class="o">]</span>
+                <span class="o">[</span>-a,--hash <span class="o">{</span>sha224,md5,sha1,sha256,sha384,sha512<span class="o">}]</span>
+                <span class="o">[</span>-o, --out REPORT-OUT<span class="o">]</span>
+                <span class="o">[</span>-f,--manifest MANIFEST<span class="o">]</span>
+                <span class="o">[</span>-E, --resetExtensions<span class="o">]</span> <span class="o">[</span>-e EXTENSION<span class="o">]</span>
+                <span class="o">[</span>-D, --resetDirectories<span class="o">]</span> <span class="o">[</span>-d DIRECTORY<span class="o">]</span>
+                <span class="o">[</span>-t/-T<span class="o">]</span>
+                <span class="o">[</span>-k/-K<span class="o">]</span>
+
+        create
+
+        check   <span class="o">[</span>-m/-M <span class="o">]</span>
+                <span class="o">[</span>-i/-I <span class="o">]</span>
+                <span class="o">[</span>-e/-E <span class="o">]</span>
+                <span class="o">[</span>-g/-G <span class="o">]</span>
+                <span class="o">[</span>-s, --summary<span class="o">]</span>
+</pre></div>
+</div>
+<div class="highlight-bash"><div class="highlight"><pre>General options <span class="k">for</span> all commands
+
+-h, --help :            Show the full <span class="nb">help </span>page
+
+-v, --verbose :         The verbose reporting level from <span class="m">0</span> or 1. The default is 1.
+                        Level <span class="m">0</span> : No output, except execution error messages.
+                        Level <span class="m">1</span> : Full output.
+
+-a, --hash HASH         Choose an alternative <span class="nb">hash </span>algorithm. Can be one of
+                        sha224, md5, sha1, sha256, sha384, sha512 - the default is sha224.
+                        On a standard default installation the above algorithms will be
+                        available. Some packages - such as OpenSSL will make more
+                        algorithms available - check the <span class="nb">help </span>page of the manifest suite
+                        on your installation to check what is available locally.
+
+-f,--manifest MANIFEST  The Manifest file to create or to check against
+                        This option will create or use the manifest file with the specified
+                        name, rather than the default <span class="sb">``</span>manifest.txt<span class="sb">``</span>
+
+-r, --root ROOT         The root directory to create the manifest from, or check the manifest against.
+
+-E,--clearExtensions    Clears the internal list of file extensions.
+                        Using this option without at least one corresponding
+                        <span class="sb">``</span>-e EXTENSION<span class="sb">``</span> option will mean that no files will be
+                        included in the manifest.
+
+-e EXTENSION :          Add a file extension to the internal list.
+                        The EXTENSION must start with a dot <span class="sb">``</span>.<span class="sb">``</span> character otherwise
+                        an error will be raised.
+
+-D, --clearDirectories  Clears the internal list of ignored Directories.
+                        Using this option without at least on corresponding
+                        <span class="sb">``</span>-d DIRECTORY<span class="sb">``</span> option will mean that all top level directories
+                        will be included in the manifest.
+
+-d DIRECTORY :          Add a directory to the internal list of ignored top level directories.
+                        It is not an error <span class="k">if</span> the name given does not exist
+
+Output Flags
+    -t/-T               Acts as a flag to <span class="nb">enable </span>or disable counting and reporting of file extensions.
+    -k/-K               Acts as a flag to <span class="nb">enable </span>or disable counting and reporting of skipped files.
+
+    For these flags the lowercase option enables the report, and an uppercase option disables the report.
+</pre></div>
+</div>
+<div class="highlight-bash"><div class="highlight"><pre>General options <span class="k">for</span> the check <span class="nb">command</span> - these must occur after the check command.
+
+Exception reporting flags
+
+    -m/-M                Whether or not to report on mismatched files
+    -i/-I                Whether or not to report on missing files
+    -x/-X                Whether or not to report on extra files
+
+    For these flags the lowercase option enables the report, and an uppercase option disables the report.
+    If a particular exception <span class="nb">type </span>is disabled <span class="k">then</span> any occurrence of this <span class="nb">type </span>of exception will not be reported
+    and the <span class="nb">command </span>will not <span class="nb">exit </span>with a failure status. By default all of these reports are enabled.
+
+Other options
+
+    -g/-G               Enables/disables grouping of exception reports files. If grouping is
+                        disabled <span class="o">(</span>using -G<span class="o">)</span> <span class="k">then</span> exceptions are reported immediately they are found,
+</pre></div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer>
+  
+    <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
+      
+        <a href="Defaults.html" class="btn btn-neutral float-right" title="Defaults" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+      
+      
+        <a href="GettingStarted.html" class="btn btn-neutral" title="Getting Started" accesskey="p"><span class="fa fa-arrow-circle-left"></span> Previous</a>
+      
+    </div>
+  
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>
+        &copy; Copyright 2016, Tony Flury.
+
+    </p>
+  </div>
+  Built with <a href="http://sphinx-doc.org/">Sphinx</a> using a <a href="https://github.com/snide/sphinx_rtd_theme">theme</a> provided by <a href="https://readthedocs.org">Read the Docs</a>. 
+
+</footer>
+
+        </div>
+      </div>
+
+    </section>
+
+  </div>
+  
+
+
+  
+
+    <script type="text/javascript">
+        var DOCUMENTATION_OPTIONS = {
+            URL_ROOT:'./',
+            VERSION:'0.0.1',
+            COLLAPSE_INDEX:false,
+            FILE_SUFFIX:'.html',
+            HAS_SOURCE:  true
+        };
+    </script>
+      <script type="text/javascript" src="_static/jquery.js"></script>
+      <script type="text/javascript" src="_static/underscore.js"></script>
+      <script type="text/javascript" src="_static/doctools.js"></script>
+
+  
+
+  
+  
+    <script type="text/javascript" src="_static/js/theme.js"></script>
+  
+
+  
+  
+  <script type="text/javascript">
+      jQuery(function () {
+          SphinxRtdTheme.StickyNav.enable();
+      });
+  </script>
+   
+
+</body>
+</html>
