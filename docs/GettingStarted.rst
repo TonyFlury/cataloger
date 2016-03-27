@@ -20,11 +20,10 @@ This will create a manifest.txt - detailing all the source code files in the cur
 The check subcommand rescursively searches the directory tree under the current directory, and computes the hash for each file - and compares that against the computed has in the manifest file.
 
 .. note::
-    Make sure you copy/deploy your manifest.txt file along with your source code - if you don't the ``manifest check`` will fail at the first attempt.
+    Make sure you copy/deploy your manifest.txt file along with your source code - if you don't the ``manifest check`` will fail immediately.
 
 By default the ``manifest check`` will detect and report on three different types of issue :
 
 - missing files : files listed in the manifest file, but which don't exist in the local directory tree.
 - extra files : files which are not listed in the manifest file, but which exist in the local directory tree.
 - incorrect hashes : files where there is a discrepancy between the hash created for the local file, and the hash listed in the manifest.
-

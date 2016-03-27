@@ -8,4 +8,24 @@ If you don't use Django, you can still use the manifest suite to check your copi
 - check for different files types
 - ignoring different directories
 
-You can also choose a different hash type if you prefer not to use sha224
+File Extension
+        [u'.py', u'.html', u'.txt', u'.css', u'.js', u'.gif', u'.png', u'.jpg', u'.jpeg']
+
+Top Level directories which are ignored :
+    [u'static', u'env', u'htmlcov', u'media',u'build', u'dist', u'docs']
+
+Default manifest file
+    'manifest.txt'
+
+Default hash/checksum algorithm.
+        'sha224' if 'sha224' in hashlib.algorithms else hashlib.algorithms[0]
+
+Reporting options
+    skipped files and file extension totals are not reported on, but they can be included by using -k and -t options
+    on the manifest command.
+
+Checking options
+    mismatched, missing and extra files are included in the reports. These checks can be disabled by using the
+    -M, -I and -X options respectively.
+
+
