@@ -136,7 +136,7 @@ class CommandEnvironment(object):
         self._manifest.write('{path}\t{signature}\n'.format(path=rel_path, signature=signature))
         self._listed_files += 1
 
-        self._report_extension()
+        self._record_extension( rel_path)
 
     def _final_create(self):
         if self._verbose == 0:
@@ -209,21 +209,25 @@ class CommandEnvironment(object):
         """ Progress through the directory trees (multiple roots) filtering out files not required
         """
         for directory, sub_directories, files in os.walk(self._root):
+
             for file_name in files:
                 if self._file_to_be_processed(directory, file_name):
                     yield os.path.relpath(os.path.join(directory, file_name), self._root)
                 else:
                     self.skipping(directory, file_name)
 
-            if directory in self._root:
+            local_dir = os.path.relpath(directory,self._root)
+            local_dir = local_dir  if local_dir != '.' else ''
+
+            if not local_dir:
                 for ignored_dir in self._ignore_directories:
                     if ignored_dir in sub_directories:
                         sub_directories.remove(ignored_dir)
 
             # In theory we have been through every file in the directory
-            if directory in self._manifest_data:
-                for f in self._manifest_data[directory]:
-                    self.missing(os.path.join(directory, f))
+            if local_dir in self._manifest_data:
+                for f in self._manifest_data[local_dir]:
+                    self.missing(os.path.join(local_dir, f))
 
         self._finalise()
 
