@@ -445,7 +445,8 @@ b.py\t889898aa898a
         self.assertItemsEqual(env.missing_files,['a.py','c.py'])
         self.assertEqual(env.extension_counts, {'.py':2})
 
-
+    def test_030_040_list(self):
+        pass
 
 # noinspection PyMissingOrEmptyDocstring,PyUnusedLocal
 def load_tests(loader, tests=None, patterns=None,excludes=None):
