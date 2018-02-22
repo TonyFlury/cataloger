@@ -20,9 +20,13 @@ __created__ = '22 Mar 2016'
 import hashlib
 
 DEFAULT_EXTENSIONS = [u'.py', u'.html', u'.txt', u'.css', u'.js', u'.gif', u'.png', u'.jpg', u'.jpeg']
-DEFAULT_IGNOREDIRECTORY = [u'static', u'env', u'htmlcov', u'media',u'build', u'dist', u'docs']
+DEFAULT_IGNOREDIRECTORY = [u'static', u'htmlcov', u'media',u'build', u'dist', u'docs']
 DEFAULT_MANIFEST_FILE = 'manifest.txt'
 DEFAULT_CONFIG_FILE = 'manifest.cfg'
-DEFAULT_HASH = 'sha224' if 'sha224' in hashlib.algorithms else hashlib.algorithms[0]
-DEFAULT_REPORTON = ['missing','extra','mismatch']
-ALL_REPORTON_OPTIONS = ['missing','extra','mismatch']
+DEFAULT_HASH = 'sha224' if 'sha224' in hashlib.algorithms_available else list(hashlib.algorithms_available)[0]
+DEFAULT_REPORTON = ['missing','record_extra','mismatch']
+DEFAULT_VERBOSE = '1'
+DEFAULT_REPORT_EXTENSIONS = True
+DEFAULT_REPORT_GROUP = True
+DEFAULT_REPORT_SKIPPED = False
+ALL_REPORTON_OPTIONS = ['missing','record_extra','mismatch']

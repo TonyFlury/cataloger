@@ -25,7 +25,7 @@ Reporting options
     on the manifest command.
 
 Checking options
-    mismatched, missing and extra files are included in the reports. These checks can be disabled by using the
+    mismatched, missing and record_extra files are included in the reports. These checks can be disabled by using the
     -M, -I and -X options respectively.
 
 

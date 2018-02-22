@@ -79,7 +79,7 @@ The full command with options is :
 
         -m/-M                Whether or not to report on mismatched files
         -i/-I                Whether or not to report on missing files
-        -x/-X                Whether or not to report on extra files
+        -x/-X                Whether or not to report on record_extra files
 
         For these flags the lowercase option enables the report, and an uppercase option disables the report.
         If a particular exception type is disabled then any occurrence of this type of exception will not be reported

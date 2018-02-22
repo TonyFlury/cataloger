@@ -14,10 +14,16 @@ Testable Statements :
 """
 
 # Always prefer setuptools over distutils
+import sys
 from setuptools import setup, find_packages
 # To use a consistent encoding
 from codecs import open
 from os import path
+
+if sys.version_info.major == 2:
+    test_extra = ['mock']
+else:
+    test_extra = []
 
 __author__ = 'Tony Flury : anthony.flury@btinternet.com'
 __created__ = '20 Mar 2016'
@@ -34,7 +40,7 @@ setup(
         # Versions should comply with PEP440.  For a discussion on single-sourcing
         # the version across setup.py and the project code, see
         # https://packaging.python.org/en/latest/single_source_version.html
-        version="0.0.2rc4",
+        version="0.0.2rc6",
 
         description='Simple to use tools to create and check directory contents - ideal for integrity checking',
         long_description=long_description,
@@ -97,8 +103,8 @@ setup(
         # for example:
         # $ pip install -e .[dev,test]
         extras_require={
-            'dev': ['check-manifest'],
-            'test': ['coverage'],
+            'dev': [],
+            'test': ['pyfakefs'] + test_extra,
         },
 
         # If there are data files included in your packages that need to be
@@ -113,6 +119,9 @@ setup(
         # http://docs.python.org/3.4/distutils/setupscript.html#installing-additional-files # noqa
         # In this case, 'data_file' will be installed into '<sys.prefix>/my_data'
         data_files=[],
+
+#        test_suite='tests.test_manifest',
+        test_suite='tests',
 
         # To provide executable scripts, use entry points in preference to the
         # "scripts" keyword. Entry points provide cross-platform support and allow

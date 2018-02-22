@@ -16,7 +16,7 @@ During the check phase - the suite will report against :
 
 - files which have different checksums in the destination directory tree compared to manifest file - i.e. the files are likely to be different.
 - files which are missing from the destination directory tree but which have a checksum within the manifest file - i.e. files which haven't been deployed at all.
-- files which exist in the destination tree but which are missing from the manifest file - these extra files may impact the behaviour of the deployed code.
+- files which exist in the destination tree but which are missing from the manifest file - these record_extra files may impact the behaviour of the deployed code.
 
 These are called exceptions - and using the right command options you can control which exception result in failures
 

@@ -147,7 +147,7 @@
 <ul class="simple">
 <li>files which have different checksums in the destination directory tree compared to manifest file - i.e. the files are likely to be different.</li>
 <li>files which are missing from the destination directory tree but which have a checksum within the manifest file - i.e. files which haven&#8217;t been deployed at all.</li>
-<li>files which exist in the destination tree but which are missing from the manifest file - these extra files may impact the behaviour of the deployed code.</li>
+<li>files which exist in the destination tree but which are missing from the manifest file - these record_extra files may impact the behaviour of the deployed code.</li>
 </ul>
 <p>These are called exceptions - and using the right command options you can control which exception result in failures</p>
 <p>The manifest checker has <a class="reference internal" href="Defaults.html"><em>default options</em></a> which are ideal for checking deployment of a Django deployment, but it can be configured either by command line to look in other places, or other file types.</p>
