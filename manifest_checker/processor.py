@@ -118,7 +118,7 @@ class ManifestProcessor(object):
     @property
     def extension_counts(self):
         """A generator of tuples of the file extensions and their counts"""
-        return ((name,count) for name,count in self._extension_counts.iteritems())
+        return ((name,count) for name,count in self._extension_counts.items())
 
     def _start_command(self):
         """Internal method to trigger the appropriate opening of the manifest file
@@ -380,12 +380,11 @@ class ManifestProcessor(object):
 
         m = hashlib.new(self._hash)
         try:
-            with open(abs_path, 'rb') as f:
-                m.update((f.read()).encode('utf-8'))
+            with open(abs_path, 'r') as f:
+                m.update(f.read().encode('utf-32'))
         except BaseException as e:
             sys.stderr.write("Error creating signature for '{}': {}\n".format(abs_path, e))
             return None
-
         return m.hexdigest().strip()
 
     def _path_rel_to_root(self, abspath):

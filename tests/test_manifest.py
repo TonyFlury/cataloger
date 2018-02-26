@@ -230,7 +230,7 @@ class TestSignatureCreation(unittest.TestCase):
             this_signature = cmd.get_signature(rel_path='a.py')
 
         non_lib_sig = hashlib.new(defaults.DEFAULT_HASH)
-        non_lib_sig.update((sample_text).encode('utf-8'))
+        non_lib_sig.update(sample_text.encode('utf-32'))
         self.assertEqual(this_signature, non_lib_sig.hexdigest().strip())
 
     def test_010_001_sha1_hash_creation(self):
@@ -245,7 +245,7 @@ class TestSignatureCreation(unittest.TestCase):
             this_signature = cmd.get_signature('a.py')
 
         non_lib_sig = hashlib.new('sha1')
-        non_lib_sig.update((sample_text).encode('utf-8'))
+        non_lib_sig.update(sample_text.encode('utf-32'))
         self.assertEqual(this_signature, non_lib_sig.hexdigest().strip())
 
     def test_010_002_sha224_hash_creation(self):
@@ -261,21 +261,22 @@ class TestSignatureCreation(unittest.TestCase):
             this_signature = cmd.get_signature('a.py')
 
         non_lib_sig = hashlib.new('sha224')
-        non_lib_sig.update((sample_text).encode('utf-8'))
+        non_lib_sig.update(sample_text.encode('utf-32'))
         self.assertEqual(this_signature, non_lib_sig.hexdigest().strip())
 
-    def test_010_003_md5_hash_creation(self):
-        """Explicit create an md5 hash"""
-        cmd = processor.ManifestProcessor(hash='md5')
+    def test_010_003_sha384_hash_creation(self):
+        """Explicit create an sha384 hash"""
+        cmd = processor.ManifestProcessor(hash='sha384')
         sample_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
 
         with patch('manifest_checker.processor.open',
                    mock_open(read_data=sample_text)) as m:
             this_signature = cmd.get_signature('a.py')
-            m.assert_has_calls([call(os.path.join(os.getcwd(), 'a.py'), 'rb')])
+            m.assert_has_calls([call(os.path.join(os.getcwd(), 'a.py'), 'r')])
 
-        non_lib_sig = hashlib.new('md5')
-        non_lib_sig.update((sample_text).encode('utf-8'))
+        print(this_signature)
+        non_lib_sig = hashlib.new('sha384')
+        non_lib_sig.update((sample_text).encode('utf-32'))
         self.assertEqual(this_signature, non_lib_sig.hexdigest().strip())
 
 
@@ -721,13 +722,18 @@ class FinalReport(unittest.TestCase):
             env.record_missing('test/a.py')
             env.record_missing('test/a.html')
             env.final_report()
-            six.assertRegex(self, output.getvalue(),
-                            r'2 missing files\n\ttest/a\.py\n\ttest/a\.html')
-            six.assertRegex(self, output.getvalue(),
-                            r'Processed by file type\n\t\'\.html\' : 1\n\t\'.py\' : 1\n')
+            m = re.search(r'2 missing files', output.getvalue())
+
+            self.assertTrue(re.search( r'\ttest/a\.py\n', output.getvalue()[m.end():]))
+            self.assertTrue(re.search( r'\ttest/a\.html\n', output.getvalue()[m.end():]))
+
+            m = re.search(r'Processed by file type\n', output.getvalue())
+            self.assertTrue(re.search(r'\t\'.py\' : 1\n', output.getvalue()[m.end():]))
+            self.assertTrue(re.search(r'\t\'.html\' : 1\n', output.getvalue()[m.end():]))
+
 
     def test_040_001_check_extra(self):
-        """Test that missing files are reported correctly in the final report"""
+        """Test that extra files are reported correctly in the final report"""
         output = six.StringIO()
         with Patcher() as patcher:
             os.chdir('/tmp')
@@ -739,13 +745,17 @@ class FinalReport(unittest.TestCase):
             env.record_extra('test/a.js')
             env.record_extra('test/a.html')
             env.final_report()
-            six.assertRegex(self, output.getvalue(),
-                            r'2 extra files\n\ttest/a\.js\n\ttest/a\.html')
-            six.assertRegex(self, output.getvalue(),
-                            r'Processed by file type\n\t\'\.js\' : 1\n\t\'.html\' : 1\n')
+            m = re.search(r'2 extra files\n', output.getvalue())
 
-    def test_040_003_check_extra(self):
-        """Test that missing files are reported correctly in the final report"""
+            self.assertTrue(re.search(r'\ttest/a\.js\n', output.getvalue()[m.end():]))
+            self.assertTrue(re.search(r'\ttest/a\.html\n', output.getvalue()[m.end():]))
+
+            m = re.search(r'Processed by file type\n', output.getvalue())
+            self.assertTrue(re.search(r'\t\'.js\' : 1\n', output.getvalue()[m.end():]))
+            self.assertTrue(re.search(r'\t\'.html\' : 1\n', output.getvalue()[m.end():]))
+
+    def test_040_003_check_mimatched(self):
+        """Test that mismatched files are reported correctly in the final report"""
         output = six.StringIO()
         with Patcher() as patcher:
             os.chdir('/tmp')
@@ -757,12 +767,14 @@ class FinalReport(unittest.TestCase):
             env.record_mismatch('test/a.js')
             env.record_mismatch('test/a.html')
             env.final_report()
-            six.assertRegex(self, output.getvalue(),
-                            r'2 files with mismatched signatures\n\ttest/a\.js\n\ttest/a\.html\n')
+            m = re.search(r'2 files with mismatched signature', output.getvalue())
 
+            self.assertTrue(re.search(r'\ttest/a\.js\n', output.getvalue()[m.end():]))
+            self.assertTrue(re.search(r'\ttest/a\.html\n', output.getvalue()[m.end():]))
 
-            six.assertRegex(self, output.getvalue(),
-                            r'Processed by file type\n\t\'\.js\' : 1\n\t\'.html\' : 1\n')
+            m = re.search(r'Processed by file type\n', output.getvalue())
+            self.assertTrue(re.search(r'\t\'.js\' : 1\n', output.getvalue()[m.end():]))
+            self.assertTrue(re.search(r'\t\'.html\' : 1\n', output.getvalue()[m.end():]))
 
 # noinspection PyMissingOrEmptyDocstring,PyUnusedLocal
 def load_tests(loader, tests=None, patterns=None,excludes=None):
