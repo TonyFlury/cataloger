@@ -47,21 +47,21 @@ The full command with options is :
 
     -r, --root ROOT         The root directory to create the manifest from, or check the manifest against.
 
-    -E,--clearExtensions    Clears the internal list of file extensions.
+    -E,--clearExtensions    Clears the internal manifest_write of file extensions.
                             Using this option without at least one corresponding
                             ``-e EXTENSION`` option will mean that no files will be
                             included in the manifest.
 
-    -e EXTENSION :          Add a file extension to the internal list.
+    -e EXTENSION :          Add a file extension to the internal manifest_write.
                             The EXTENSION must start with a dot ``.`` character otherwise
                             an error will be raised.
 
-    -D, --clearDirectories  Clears the internal list of ignored Directories.
+    -D, --clearDirectories  Clears the internal manifest_write of ignored Directories.
                             Using this option without at least on corresponding
                             ``-d DIRECTORY`` option will mean that all top level directories
                             will be included in the manifest.
 
-    -d DIRECTORY :          Add a directory to the internal list of ignored top level directories.
+    -d DIRECTORY :          Add a directory to the internal manifest_write of ignored top level directories.
                             It is not an error if the name given does not exist
 
     Output Flags

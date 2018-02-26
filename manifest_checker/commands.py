@@ -16,14 +16,10 @@ import os.path
 import sys
 import click
 
-from environment import CommandEnvironment
-from lib import pass_environment
-from manifest_checker.environment import CommandEnvironment, ManifestError
-from manifest_checker import defaults
+import manifest_checker.processor as environment
+import manifest_checker.defaults as defaults
 
-from manifest_checker.lib import pass_environment
-
-# from create_manifest import get_sha224, walk_files
+from templatelite import Renderer
 
 __version__ = "0.1"
 __author__ = 'Tony Flury : anthony.flury@btinternet.com'
@@ -38,21 +34,20 @@ __created__ = '09 Feb 2016'
                 help='Whether or not to report on record_extra files - default Enabled.')
 @click.option('-g/-G', 'group',is_flag=True, default = defaults.DEFAULT_REPORT_GROUP,
                 help='Turns off grouping of reported files.  Files in error are reported as they are found.')
-@pass_environment
-def check(env, **kwargs ):
+@click.pass_context
+def check(ctx, **kwargs ):
+    ctx.obj.update(kwargs)
+
+    check_manifest(**ctx.obj)    # Indirect method to allow for API call
+
+
+def check_manifest(**kwargs):
     try:
-        check_manifest(env,**kwargs)
-    except ManifestError as e:
+        env = environment.ManifestProcessor(action='check', **kwargs)
+    except environment.ManifestError as e:
         sys.stderr.write("Unable to read manifest file '{}' : {}\n".format(
-            self._manifest_name, e))
+                kwargs.get('manifest',defaults.DEFAULT_MANIFEST_FILE), e))
         sys.exit(1)
-
-
-def check_manifest(env, **kwargs):
-    assert isinstance(env, CommandEnvironment)
-
-    env.start_command(subcommand='check', **kwargs)
-    env.load_manifest()
 
     for directory, files in env.walk():
 
@@ -79,19 +74,36 @@ def check_manifest(env, **kwargs):
             for file in env.get_non_processed(directory):
                 env.record_missing(os.path.join(directory, file))
 
-    env._finalise()
+    report = Renderer( template_file=os.path.join(os.path.dirname(__file__,),'templates','final_check.tmpl'),
+                       remove_indentation=False).from_context(
+                           {'report_skipped': env._report_skipped,
+                            'skipped_files':env.skipped_files},
+                           {'report_extension': env._report_extension,
+                            'extensions':env.extension_counts},
+                           {'report_mismatch' : env._report_mismatch,
+                            'mismatched': env.mismatched_files},
+                            {'report_missing' : env._report_missing,
+                             'missing': env.missing_files},
+                            {'report_extra': env._report_extra,
+                                'extra': env.extra_files}, )
+
+    kwargs.get('output', sys.stdout).write(report)
+
+    print('-'*80)
+
+    env.final_report()
 
 @click.command('create', help='Create a new manifest')
-@pass_environment
-def create(env, **kwargs):
-    assert isinstance(env,CommandEnvironment)
+@click.pass_context
+def create(ctx, **kwargs):
 
-    env.start_command(subcommand='create', **kwargs)
+    env = environment.ManifestProcessor( action='create', **ctx.obj )
 
     for directory, files in env.walk():
         for file in files:
             signature = env.get_signature( rel_path=os.path.join(directory, file) )
             if signature:
-                env.list(rel_path=os.path.join(directory, file), signature=signature)
+                env.manifest_write(rel_path=os.path.join(directory, file), signature=signature)
 
-    env._finalise()
+    env.final_report()
+    sys.stderr.write('\n'.join(env._skipped_files))

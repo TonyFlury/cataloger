@@ -11,9 +11,7 @@ The main CLI interface - implemented using the click framework.
 import os
 import click
 import hashlib
-import environment
-from defaults import DEFAULT_MANIFEST_FILE, DEFAULT_HASH, DEFAULT_VERBOSE, DEFAULT_REPORT_SKIPPED, DEFAULT_EXTENSIONS
-from manifest_checker.lib import pass_environment
+import defaults
 import pkg_resources
 
 import commands
@@ -41,59 +39,73 @@ def get_version(ctx, param, value):
             pkg_resources.require("manifest-checker")[0].version))
     ctx.exit()
 
-class CollectExtensions(object):
-    _inst = None
-    def __new__(cls):
-        if cls._inst:
-            return cls._inst
-        else:
-            cls._inst =  object.__new__(cls)
 
-        return cls._inst
 
-    def __init__(self):
-        self._extensions = DEFAULT_EXTENSIONS
-
-    def add_extension(self, ctx, param, value ):
+class CollectValues(object):
+    _value = []
+    @classmethod
+    def add_value(cls, ctx, param, value):
         if len(value) == 0:
-            return value
+            return cls._value
+
+        if hasattr(cls, '_validate'):
+            cls._validate(value)
+
+        cls._value.extend(value)
+        return cls._value
+
+    @classmethod
+    def clear_values(cls, ctx, param, value):
+        if value:
+            cls._value = []
+        return cls._value
+
+class CollectExtensions(CollectValues):
+    _value = defaults.DEFAULT_EXTENSIONS
+
+    @classmethod
+    def _validate(cls, value):
         if any(True for x in value if x[0] != "."):
             raise click.BadParameter("file extensions must start with a '.'")
 
-        self._extensions.extend(value)
-        return self._extensions
-
-    def clear_extensions(self, ctx, param, value):
-        if value:
-            self._extensions = []
-        return self._extensions
-
+class CollectDirectories(CollectValues):
+    _value = defaults.DEFAULT_IGNOREDIRECTORY
 
 @click.group()
 @click.pass_context
 @click.option('--version', is_flag=True, callback=get_version, expose_value=False, is_eager=True)
-@click.option('-v', '--verbose', type=click.Choice(['0', '1', '2', '3']), default=DEFAULT_VERBOSE)
+@click.option('-v', '--verbose', type=click.Choice(['0', '1', '2', '3']), default=defaults.DEFAULT_VERBOSE)
 @click.option('-a', '--hash', type=click.Choice(hashlib.algorithms_available),
-              default=DEFAULT_HASH, help='The hash algorithm to use in order to compare file contents.')
+              default=defaults.DEFAULT_HASH, help='The hash algorithm to use in order to compare file contents.')
 @click.option('-f', '--manifest', envvar='MANIFEST',
-              default=DEFAULT_MANIFEST_FILE,
-              help='The manifest file to use - default is `{}`'.format(DEFAULT_MANIFEST_FILE))
+              default=defaults.DEFAULT_MANIFEST_FILE,
+              help='The manifest file to use - default is `{}`'.format(defaults.DEFAULT_MANIFEST_FILE))
 @click.option('-r', '--root', metavar='ROOT', default=os.getcwd(), callback=validate_root,
               help='The root directory to create the manifest from, or check the manifest against.')
-@click.option('-E', '--clearExtensions', is_flag=True, default=False,
-              help='Reset the included file extensions to an empty list',
-              expose_value = False,
-              callback = CollectExtensions().clear_extensions )
+
+@click.option('-f','--filter', metavar='FILTER', multiple=True, default='',
+              help='A standard file match wildcard - files/directories are excluded if they match this value')
+
 @click.option('-e', '--extension', multiple=True, metavar='EXTENSION', default='',
-              help='Add an file extension to the list of those to be accepted',
-              callback=CollectExtensions().add_extension)
-@click.option('-D', '--clearDirectory', is_flag=True,
-              help = 'Reset the list of top level directories to be ignored to an empty list')
-@click.option('-d', '--ignoreDirectory', multiple=True, metavar='DIRECTORY',
-              help='Add a directory to the list of top level directories to be ignored')
-@click.option('-k/-K', 'report_skipped', is_flag=True, default=DEFAULT_REPORT_SKIPPED,
+              help='Add an file extension to the manifest_write of those to be accepted',
+              callback=CollectExtensions.add_value)
+@click.option('-E', '--clearExtensions', is_flag=True, default=False,
+              help='Reset the included file extensions to an empty manifest_write',
+              expose_value = False,
+              callback = CollectExtensions.clear_values)
+
+@click.option('-d', '--ignoreDirectory', multiple=True, metavar='DIRECTORY', default='',
+              help='Add a directory to the list of top level directories to be ignored',
+              callback=CollectDirectories.add_value)
+@click.option('-D', '--clearDirectory', is_flag=True, default=False,
+              help='Reset the list of top level directories to be ignored to an empty list',
+              expose_value=False,
+              callback=CollectDirectories.clear_values)
+
+@click.option('-k/-K', 'report_skipped', is_flag=True, default='report_skipped' in defaults.DEFAULT_REPORTON,
               help='Whether or not to report (in summary) on skipped files')
-@click.option('-t/-T', 'report_extensions', is_flag=True, default=False,
+
+@click.option('-t/-T', 'report_extensions', is_flag=True, default=defaults.DEFAULT_REPORT_EXTENSIONS,
               help='Whether or not to report (in summary) on checked file extensions')
 def primary(ctx, **kwargs):
     """
@@ -115,7 +127,7 @@ def primary(ctx, **kwargs):
     (i.e. those directly under the current directory). Typically these are directories which are
     used for development/testing, but which are not deployed (they are either recreated on deployment,
     they are dynamically created, or are present only for testing/development purposes). The default
-    list of these ignore directories are :
+    manifest_write of these ignore directories are :
 
     \b
         ['static','media','htmlcov','env','docs','build','dist']
@@ -128,15 +140,14 @@ def primary(ctx, **kwargs):
     When the `-D,--clearDirectory` option is used this will ignore the default ignored directories above and
     ONLY use those extensions added by the `-e` option.
     """
-    if not kwargs['extension'] and DEFAULT_EXTENSIONS:
+    if not kwargs['extension'] and defaults.DEFAULT_EXTENSIONS:
         raise click.BadOptionUsage('-E should not be used on it\'s own - specify at least one -e option' )
         sys.exit(1)
 
-    ctx.obj = environment.CommandEnvironment(**kwargs)
+    ctx.obj = kwargs
 
 
 def main():
-    extension_list = CollectExtensions()
     primary.add_command(commands.check)
     primary.add_command(commands.create)
     primary()
