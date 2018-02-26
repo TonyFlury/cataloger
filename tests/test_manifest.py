@@ -662,7 +662,7 @@ b.py\t889898aa898a
             env.record_extra('./c.py')
 
         six.assertCountEqual(self,env.extra_files,['a.py','c.py'])
-        self.assertEqual(env.extension_counts, {'.py':2})
+        self.assertEqual(dict([(k,v) for k,v in env.extension_counts]), {'.py':2})
 
     def test_030_021_record_mismatch(self):
         """functionality of record_mismatch method"""
@@ -675,7 +675,7 @@ b.py\t889898aa898a
             env.record_mismatch('./c.py')
 
         six.assertCountEqual(self,env.mismatched_files,['a.py','c.py'])
-        self.assertEqual(env.extension_counts, {'.py':2})
+        self.assertEqual(dict([(k,v) for k,v in env.extension_counts]), {'.py':2})
 
     def test_030_022_record_missing(self):
         """functionality of record_missing method"""
@@ -687,7 +687,7 @@ b.py\t889898aa898a
             env.record_missing('./c.py')
 
         six.assertCountEqual(self,env.missing_files,['a.py','c.py'])
-        self.assertEqual(env.extension_counts, {'.py':2})
+        self.assertEqual(dict([(k,v) for k,v in env.extension_counts]), {'.py':2})
 
     def test_030_040_manifest_write(self):
         """Manifest_write with faked file and signature"""
