@@ -96,8 +96,12 @@ def check_manifest(**kwargs):
 @click.command('create', help='Create a new manifest')
 @click.pass_context
 def create(ctx, **kwargs):
+    ctx.obj.update(kwargs)
+    create_manifest(**ctx.obj)
 
-    env = environment.ManifestProcessor( action='create', **ctx.obj )
+def create_manifest(**kwargs):
+
+    env = environment.ManifestProcessor( action='create', **kwargs )
 
     for directory, files in env.walk():
         for file in files:
@@ -106,4 +110,3 @@ def create(ctx, **kwargs):
                 env.manifest_write(rel_path=os.path.join(directory, file), signature=signature)
 
     env.final_report()
-    sys.stderr.write('\n'.join(env._skipped_files))

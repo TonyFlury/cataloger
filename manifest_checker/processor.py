@@ -381,7 +381,7 @@ class ManifestProcessor(object):
         m = hashlib.new(self._hash)
         try:
             with open(abs_path, 'r') as f:
-                m.update(f.read().encode('utf-32'))
+                m.update(f.read())
         except BaseException as e:
             sys.stderr.write("Error creating signature for '{}': {}\n".format(abs_path, e))
             return None
@@ -396,6 +396,7 @@ class ManifestProcessor(object):
         self._skipped_files.append(os.path.join(directory,file_name))
 
     def mark_processed(self, rel_path, status='processed'):
+        """Mark a file as having been processed"""
         if not self._manifest_data:
             return
 

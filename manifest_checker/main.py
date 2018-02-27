@@ -75,7 +75,8 @@ class CollectDirectories(CollectValues):
 @click.pass_context
 @click.option('--version', is_flag=True, callback=get_version, expose_value=False, is_eager=True)
 @click.option('-v', '--verbose', type=click.Choice(['0', '1', '2', '3']), default=defaults.DEFAULT_VERBOSE)
-@click.option('-a', '--hash', type=click.Choice(hashlib.algorithms_available - 'md5'),
+@click.option('-a', '--hash',
+              type=click.Choice(hashlib.algorithms_available - {'md5'} ),
               default=defaults.DEFAULT_HASH, help='The hash algorithm to use in order to compare file contents.')
 @click.option('-f', '--manifest', envvar='MANIFEST',
               default=defaults.DEFAULT_MANIFEST_FILE,
