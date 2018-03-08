@@ -32,8 +32,6 @@ __created__ = '09 Feb 2016'
                 help='Whether or not to report on files with mismatched checksums - default Enabled.')
 @click.option('-x/-X', 'report_extra', is_flag=True, default='report_extra' in defaults.DEFAULT_REPORTON,
                 help='Whether or not to report on record_extra files - default Enabled.')
-@click.option('-g/-G', 'group',is_flag=True, default = defaults.DEFAULT_REPORT_GROUP,
-                help='Turns off grouping of reported files.  Files in error are reported as they are found.')
 @click.pass_context
 def check(ctx, **kwargs ):
     ctx.obj.update(kwargs)
@@ -54,7 +52,7 @@ def check_manifest(**kwargs):
         for file in files:
 
             # If there is no signature for this file in the manifest, then mark this as record_extra file
-            if not env.is_file_in_manifest(directory=directory,file=file):
+            if not env.is_file_in_manifest(directory=directory, file_name=file):
                 env.record_extra(rel_path=os.path.join(directory, file))
                 continue
 

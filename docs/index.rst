@@ -37,6 +37,8 @@ If you use non default configuration options on the command line to create your 
 
     GettingStarted
     CommandLineOptions
+    config
+    ExtraInfo
     Defaults
 
 

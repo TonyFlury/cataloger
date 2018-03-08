@@ -1,0 +1,8 @@
+{{ processed|len }} files processed {% if report_skipped %} - {{ skipped_files|len }} files skipped {% endif %}
+
+{% if report_extension %}
+Files processed by file types:
+    {% for extension, count in extensions %}
+    {{ extension }} : {{ count }}
+    {% endfor %}
+{% endif %}

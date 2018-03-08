@@ -1,2 +1,5 @@
 click
 templatelite
+six
+sphinx
+sphinx-rtd-theme

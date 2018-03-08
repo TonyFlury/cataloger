@@ -154,7 +154,7 @@ class TestEnvCreation(unittest.TestCase):
         self.assertEqual(env._manifest_name, defaults.DEFAULT_MANIFEST_FILE)
         self.assertEqual(env._verbose, defaults.DEFAULT_VERBOSE)
         self.assertEqual(env._hash, defaults.DEFAULT_HASH)
-        self.assertEqual(env._root, os.getcwd() )
+        self.assertEqual(env._root, '.' )
         self.assertEqual(env._report_skipped, 'report_skipped' in defaults.DEFAULT_REPORTON)
         self.assertEqual(env._report_extension, defaults.DEFAULT_REPORT_EXTENSIONS)
         self.assertEqual(env._group, defaults.DEFAULT_REPORT_GROUP)
@@ -165,7 +165,7 @@ class TestEnvCreation(unittest.TestCase):
         """Test the start command"""
         with patch('manifest_checker.processor.open', mock_open()) as m:
             env = processor.ManifestProcessor(action='create')
-            m.assert_called_once_with('manifest.txt','w')
+            m.assert_has_calls([call('manifest.txt','w'),call('manifest.cfg','r')],any_order=True)
 
     def test_000_002_start_check_command(self):
         """Test the start command - empty manifest"""
@@ -173,9 +173,45 @@ class TestEnvCreation(unittest.TestCase):
             m.return_value = MagicMock(name='file')
             with six.assertRaisesRegex(self, processor.ManifestError, r'Empty manifest file : manifest\.txt'):
                 env = processor.ManifestProcessor(action='check')
-            m.assert_called_once_with('manifest.txt','r')
+            m.assert_has_calls([call('manifest.txt','r'),call('manifest.cfg','r')],any_order=True)
             call_names = set(x[0] for x in m.return_value.mock_calls)
             self.assertTrue( 'close' in call_names or ('__enter__' in call_names and '__exit__' in call_names))
+
+    def test_000_003_config_default_notthere(self):
+        """No Explicit config file parameter, no default config - no warning"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            with patch('sys.stderr', six.StringIO()) as stderr:
+                env= processor.ManifestProcessor()
+                self.assertEqual(stderr.getvalue(), '')
+
+    def test_000_003e_config_explicit_notthere(self):
+        """Explicit config file parameter, no config file, warning generated"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            with patch('sys.stderr', six.StringIO()) as stderr:
+                env= processor.ManifestProcessor(config='manifest.cfg')
+                six.assertRegex(self, stderr.getvalue(), 'Warning : Unable to open config file \'manifest.cfg\'; continuing with defaults')
+
+    def test_000_004_config_default_noperm(self):
+        """No Explicit config file parameter, config file exists but no perm"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg')
+            os.chmod('/tmp/manifest.cfg', 007)
+            with patch('sys.stderr', six.StringIO()) as stderr:
+                with six.assertRaisesRegex(self, processor.ConfigError, r'Permission denied'):
+                    env= processor.ManifestProcessor()
+
+    def test_000_004e_config_explicit_noperm(self):
+        """Explicit config file parameter, config file exists but no perm"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg')
+            os.chmod('/tmp/manifest.cfg', 007)
+            with patch('sys.stderr', six.StringIO()) as stderr:
+                with six.assertRaisesRegex(self, processor.ConfigError, r'Permission denied'):
+                    env= processor.ManifestProcessor(config='manifest.cfg')
 
     def test_000_010_new_mock_open(self):
         data = 'this is data\nspread over many lines\nto see if \n iter will work'
@@ -193,11 +229,10 @@ class TestEnvCreation(unittest.TestCase):
 b.py\t787787ef7e
 c.py\t7898798acd"""
         with patch('manifest_checker.processor.open', new_mock_open(read_data=manifest)) as m:
-            env = processor.ManifestProcessor(action='check')
+            env = processor.ManifestProcessor(action='check', no_config=True)
             m.assert_called_once_with('manifest.txt', 'r')
             call_names = set(x[0] for x in m.return_value.mock_calls)
             self.assertTrue( 'close' in call_names or ('__enter__' in call_names and '__exit__' in call_names))
-#            m.return_value.close.assert_called()
 
     def test_000_030_start_invalid_command(self):
         """Test the start command"""
@@ -207,7 +242,7 @@ c.py\t7898798acd"""
     def test_000_031_empty_extension_list(self):
         """Instantiate Command environment with empty extension manifest_write"""
         with six.assertRaisesRegex(self, processor.ManifestError, r'No file extensions given to catalogue or check'):
-            env = processor.ManifestProcessor(extension=[])
+            env = processor.ManifestProcessor(extensions=[])
 
 class TestSignatureCreation(unittest.TestCase):
 
@@ -222,15 +257,18 @@ class TestSignatureCreation(unittest.TestCase):
 
         sample_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
 
-        with Patcher() as patcher:
-            os.chdir('/tmp')
-            patcher.fs.CreateFile('a.py', contents=sample_text)
-            cmd = processor.ManifestProcessor(action='create')
+        cmd = processor.ManifestProcessor(action='create')
 
-            this_signature = cmd.get_signature(rel_path='a.py')
+        with patch('manifest_checker.processor.open',
+                   mock_open(read_data=sample_text)) as m:
+            this_signature = cmd.get_signature('a.py')
+            m.assert_has_calls([call('./a.py', 'r')])
+            call_names = set(x[0] for x in m.return_value.mock_calls)
+            self.assertTrue( 'close' in call_names or
+                             ('__enter__' in call_names and '__exit__' in call_names))
 
         non_lib_sig = hashlib.new(defaults.DEFAULT_HASH)
-        non_lib_sig.update(sample_text.encode('utf-32'))
+        non_lib_sig.update(sample_text)
         self.assertEqual(this_signature, non_lib_sig.hexdigest().strip())
 
     def test_010_001_sha1_hash_creation(self):
@@ -238,14 +276,18 @@ class TestSignatureCreation(unittest.TestCase):
 
         sample_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
 
-        with Patcher() as patcher:
-            os.chdir('/tmp')
-            patcher.fs.CreateFile('a.py', contents=sample_text)
-            cmd = processor.ManifestProcessor(action='create', hash='sha1')
+        cmd = processor.ManifestProcessor(action='create', hash='sha1')
+
+        with patch('manifest_checker.processor.open',
+                   mock_open(read_data=sample_text)) as m:
             this_signature = cmd.get_signature('a.py')
+            m.assert_has_calls([call('./a.py', 'r')])
+            call_names = set(x[0] for x in m.return_value.mock_calls)
+            self.assertTrue( 'close' in call_names or
+                             ('__enter__' in call_names and '__exit__' in call_names))
 
         non_lib_sig = hashlib.new('sha1')
-        non_lib_sig.update(sample_text.encode('utf-32'))
+        non_lib_sig.update(sample_text)
         self.assertEqual(this_signature, non_lib_sig.hexdigest().strip())
 
     def test_010_002_sha224_hash_creation(self):
@@ -253,15 +295,18 @@ class TestSignatureCreation(unittest.TestCase):
 
         sample_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
 
-        with Patcher() as patcher:
-            os.chdir('/tmp')
-            patcher.fs.CreateFile('a.py', contents=sample_text)
-            cmd = processor.ManifestProcessor(hash='sha224', action='create')
+        cmd = processor.ManifestProcessor(action='create', hash='sha224')
 
+        with patch('manifest_checker.processor.open',
+                   mock_open(read_data=sample_text)) as m:
             this_signature = cmd.get_signature('a.py')
+            m.assert_has_calls([call('./a.py', 'r')])
+            call_names = set(x[0] for x in m.return_value.mock_calls)
+            self.assertTrue( 'close' in call_names or
+                             ('__enter__' in call_names and '__exit__' in call_names))
 
         non_lib_sig = hashlib.new('sha224')
-        non_lib_sig.update(sample_text.encode('utf-32'))
+        non_lib_sig.update(sample_text)
         self.assertEqual(this_signature, non_lib_sig.hexdigest().strip())
 
     def test_010_003_sha384_hash_creation(self):
@@ -272,11 +317,13 @@ class TestSignatureCreation(unittest.TestCase):
         with patch('manifest_checker.processor.open',
                    mock_open(read_data=sample_text)) as m:
             this_signature = cmd.get_signature('a.py')
-            m.assert_has_calls([call(os.path.join(os.getcwd(), 'a.py'), 'r')])
+            m.assert_has_calls([call('./a.py', 'r')])
+            call_names = set(x[0] for x in m.return_value.mock_calls)
+            self.assertTrue( 'close' in call_names or
+                             ('__enter__' in call_names and '__exit__' in call_names))
 
-        print(this_signature)
         non_lib_sig = hashlib.new('sha384')
-        non_lib_sig.update((sample_text).encode('utf-32'))
+        non_lib_sig.update(sample_text)
         self.assertEqual(this_signature, non_lib_sig.hexdigest().strip())
 
 
@@ -388,7 +435,7 @@ class TestWalk(unittest.TestCase):
             for d in defaults.DEFAULT_IGNOREDIRECTORY:
                 patcher.fs.CreateDirectory(os.path.join('/tmp',d))
 
-            six.assertCountEqual(self,os.listdir(os.getcwd()), ['test', 't1.py','t2.py'] + defaults.DEFAULT_IGNOREDIRECTORY)
+            six.assertCountEqual(self,os.listdir(os.getcwd()), ['test', 't1.py','t2.py'] + list(defaults.DEFAULT_IGNOREDIRECTORY) )
             six.assertCountEqual(self,os.listdir('/tmp/test'),['test.py'])
 
             for directory, files in env.walk():
@@ -397,14 +444,14 @@ class TestWalk(unittest.TestCase):
         six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['test.py']})
         self.assertEqual(env._skipped_file_count, 0)
 
-    def test_020_050_single_filter_no_match(self):
+    def test_020_050_single_exclude_filter_no_match(self):
         """Single filter argument, which shouldn't match anything"""
         dir = {}
 
         with Patcher() as patcher:
             os.chdir('/tmp')
 
-            env = processor.ManifestProcessor(filter=['*wibble*'])
+            env = processor.ManifestProcessor(exclude_filter=['*wibble*'])
 
             patcher.fs.CreateFile('t1.py')
             patcher.fs.CreateFile('t2.py')
@@ -416,14 +463,14 @@ class TestWalk(unittest.TestCase):
         six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['test.py']})
         self.assertEqual(env._skipped_file_count, 0)
 
-    def test_020_051_single_filter_match_file(self):
+    def test_020_051_single_exclude_filter_match_file(self):
         """Single filter argument, which will match one file"""
         dir = {}
 
         with Patcher() as patcher:
             os.chdir('/tmp')
 
-            env = processor.ManifestProcessor(filter=['*/tike.py'])
+            env = processor.ManifestProcessor(exclude_filter=['*/tike.py'])
 
             patcher.fs.CreateFile('t1.py')
             patcher.fs.CreateFile('t2.py')
@@ -435,14 +482,14 @@ class TestWalk(unittest.TestCase):
         six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py']})
         self.assertEqual(env._skipped_file_count, 1)
 
-    def test_020_052_single_filter_match_directory(self):
+    def test_020_052_single_exclude_filter_match_directory(self):
         """Single filter argument, which will match one file"""
         dir = {}
 
         with Patcher() as patcher:
             os.chdir('/tmp')
 
-            env = processor.ManifestProcessor(filter=['*/test/*'])
+            env = processor.ManifestProcessor(exclude_filter=['test/*'])
 
             patcher.fs.CreateFile('t1.py')
             patcher.fs.CreateFile('t2.py')
@@ -454,14 +501,14 @@ class TestWalk(unittest.TestCase):
         six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py']})
         self.assertEqual(env._skipped_file_count, 1)
 
-    def test_020_054_multiple_filters_no_matches(self):
+    def test_020_054_multiple_exclude_filters_no_matches(self):
         """Multiple filters which match nothing"""
         dir = {}
 
         with Patcher() as patcher:
             os.chdir('/tmp')
 
-            env = processor.ManifestProcessor(filter=['*wibble*','*wobble*'])
+            env = processor.ManifestProcessor(exclude_filter=['*wibble*','*wobble*'])
 
             patcher.fs.CreateFile('t1.py')
             patcher.fs.CreateFile('t2.py')
@@ -473,14 +520,14 @@ class TestWalk(unittest.TestCase):
         six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['t1.py']})
         self.assertEqual(env._skipped_file_count, 0)
 
-    def test_020_056_multiple_filters_one_match(self):
+    def test_020_056_multiple_exclude_filters_one_match(self):
         """Multiple filters where one places matches"""
         dir = {}
 
         with Patcher() as patcher:
             os.chdir('/tmp')
 
-            env = processor.ManifestProcessor(filter=['*wibble*','*/a?.*'])
+            env = processor.ManifestProcessor(exclude_filter=['*wibble*','*/a?.*'])
 
             patcher.fs.CreateFile('t1.py')
             patcher.fs.CreateFile('t2.py')
@@ -493,14 +540,14 @@ class TestWalk(unittest.TestCase):
         six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['a3a.py']})
         self.assertEqual(env._skipped_file_count, 1)
 
-    def test_020_058_multiple_filters_multiple_match(self):
+    def test_020_058_multiple_exclude_filters_multiple_match(self):
         """Multiple filters where one places matches"""
         dir = {}
 
         with Patcher() as patcher:
             os.chdir('/tmp')
 
-            env = processor.ManifestProcessor(filter=['*wibble*','*/a?.*'])
+            env = processor.ManifestProcessor(exclude_filter=['*wibble*','*/a?.*'])
 
             patcher.fs.CreateFile('t1.py')
             patcher.fs.CreateFile('t2.py')
@@ -699,7 +746,7 @@ b.py\t889898aa898a
             env = processor.ManifestProcessor(action='create', verbose=0)
             env.manifest_write(file_name, signature)
             env.final_report()
-            m.assert_called_once_with('manifest.txt','w')
+            m.assert_has_calls([call('manifest.txt','w'),call('manifest.cfg','r')],any_order=True)
             m.return_value.write('{}\t{}\n'.format(file_name, signature))
 
 class FinalReport(unittest.TestCase):
@@ -775,6 +822,535 @@ class FinalReport(unittest.TestCase):
             m = re.search(r'Processed by file type\n', output.getvalue())
             self.assertTrue(re.search(r'\t\'.js\' : 1\n', output.getvalue()[m.end():]))
             self.assertTrue(re.search(r'\t\'.html\' : 1\n', output.getvalue()[m.end():]))
+
+
+class TestManifestConfig(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def test_050_000_manifest_line_present(self):
+        """Test that the manifest section with a manifest= line is captured correctly"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [manifest]
+    manifest=manifest.mft
+        """)
+            env = processor.ManifestProcessor()
+            env._process_config()
+            self.assertEqual(env.manifest_file_name,'manifest.mft')
+            self.assertEqual(env._hash, 'sha224')
+            self.assertEqual(env._root, '.')
+            six.assertCountEqual(self, env._extensions, defaults.DEFAULT_EXTENSIONS)
+
+    def test_050_001_hash_line_present(self):
+        """Test that the manifest section with a hash= line is captured correctly"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [manifest]
+    hash=sha1
+        """)
+            env = processor.ManifestProcessor()
+            self.assertEqual(env.manifest_file_name,'manifest.txt')
+            self.assertEqual(env._hash, 'sha1')
+            self.assertEqual(env._root, '.')
+            six.assertCountEqual(self, env._extensions, defaults.DEFAULT_EXTENSIONS)
+
+    def test_050_001_root_line_present(self):
+        """Test that the manifest section with a root= line is captured correctly"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [manifest]
+    root=src
+        """)
+            env = processor.ManifestProcessor()
+            self.assertEqual(env.manifest_file_name,'manifest.txt')
+            self.assertEqual(env._hash, 'sha224')
+            self.assertEqual(env._root, 'src')
+            six.assertCountEqual(self, env._extensions, defaults.DEFAULT_EXTENSIONS)
+
+    def test_050_010_invalid_hash(self):
+        """Test that the manifest section with an invalid hash value is detected"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [manifest]
+    hash = gibberish
+        """)
+            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value for hash : \'hash = gibberish\' on line 2'):
+                env = processor.ManifestProcessor()
+
+    def test_050_010_invalid_option(self):
+        """Test that the manifest section with an invalid option name"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [manifest]
+    extension=.py
+        """)
+            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid config line in section \[manifest\] : \'extension=.py\' on line 2'):
+                env = processor.ManifestProcessor()
+
+class TestExtensionConfig(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def test_050_100_equal(self):
+        """Test that the extension section with an = operator is correct"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [extensions]
+    =.py,.html,.js
+        """)
+            env = processor.ManifestProcessor()
+            six.assertCountEqual(self, env._extensions, ['.py','.html','.js'])
+
+    def test_050_101_minus(self):
+        """Test that the extension section with an - operator is correct"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [extensions]
+    - .py,.html,.js
+        """)
+            env = processor.ManifestProcessor()
+            six.assertCountEqual(self, env._extensions, defaults.DEFAULT_EXTENSIONS - {'.py','.html','.js'} )
+
+    def test_050_102_plus(self):
+        """Test that the extension section with an + operator is correct"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [extensions]
+    + .jsx, .cfg, .com
+        """)
+            env = processor.ManifestProcessor()
+            six.assertCountEqual(self, env._extensions, defaults.DEFAULT_EXTENSIONS | {'.jsx', '.cfg', '.com'})
+
+    def test_050_110_invalid_operator(self):
+        """Test that the extension section with an invalid operator is correctly detected"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [extensions]
+    * .jsx, .cfg, .com
+        """)
+            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid operator in \[extension\] section : \'\* \.jsx, \.cfg, \.com\' on line 2'):
+                env = processor.ManifestProcessor()
+
+    def test_050_115_invalid_extension_missing_dot(self):
+        """Test that the extension section with an extension missing a dot"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [extensions]
+    + .jsx, .cfg, com
+        """)
+            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in \[extension\] section : \'\+ \.jsx, \.cfg, com\' on line 2'):
+                env = processor.ManifestProcessor()
+
+    def test_050_115_invalid_extensions_null_string(self):
+        """Test that the extension section with an null string extension"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [extensions]
+    + .jsx, , .com
+        """)
+            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in \[extension\] section : \'\+ \.jsx, , \.com\' on line 2'):
+                env = processor.ManifestProcessor()
+
+    def test_050_115_invalid_extensions_dot_only(self):
+        """Test that the extension section with an extension which is just a dot"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [extensions]
+    + .jsx, . , .com
+        """)
+            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in \[extension\] section : \'\+ \.jsx, \. , \.com\' on line 2'):
+                env = processor.ManifestProcessor()
+
+class TestDirectoryConfig(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def test_050_200_equal(self):
+        """Test that the directories section with an = operator is correct"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [directories]
+    = docs, src, coverage
+        """)
+            env = processor.ManifestProcessor()
+            six.assertCountEqual(self, env._ignore_directories, {'docs', 'src', 'coverage'} )
+
+    def test_050_201_minus(self):
+        """Test that the directories section with an - operator is correct"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [directories]
+    - static, htmlcov, docs
+        """)
+            env = processor.ManifestProcessor()
+            six.assertCountEqual(self, env._ignore_directories, defaults.DEFAULT_IGNOREDIRECTORY - {'static', 'htmlcov', 'docs'} )
+
+    def test_050_202_plus(self):
+        """Test that the directories section with an + operator is correct"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [directories]
+    + build, dist
+        """)
+            env = processor.ManifestProcessor()
+            six.assertCountEqual(self, env._ignore_directories, defaults.DEFAULT_IGNOREDIRECTORY | {'build', 'dist'} )
+
+    def test_050_210_invalid_operator(self):
+        """Test that the directories section with an invalid operator is correctly detected"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [directories]
+    * build, dist
+        """)
+            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid operator in \[directories\] section : \'\* build, dist\' on line 2'):
+                env = processor.ManifestProcessor()
+
+    def test_050_215_null_string(self):
+        """Test that the directories section with an null string directories"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [directories]
+    + build, , dist
+        """)
+            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in \[directories\] section : \'\+ build, , dist\' on line 2'):
+                env = processor.ManifestProcessor()
+
+    def test_050_216_empty_list(self):
+        """Test that the directories section with an null string directories"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [directories]
+    =
+        """)
+            env = processor.ManifestProcessor()
+            self.assertEqual(env._ignore_directories,set())
+
+class TestFilterConfig(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def test_050_300_include_line_present(self):
+        """Test that the manifest section with a manifest= line is captured correctly"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [filters]
+    include = *test*, splat*, blah/*
+        """)
+            env = processor.ManifestProcessor()
+            six.assertCountEqual(self,  env._include_filter, ['*test*','splat*','blah/*'])
+
+    def test_050_301_exclude_line_present(self):
+        """Test that the manifest section with a manifest= line is captured correctly"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [filters]
+    exclude = *test*, splat*, blah/*
+        """)
+            env = processor.ManifestProcessor()
+            six.assertCountEqual(self,  env._exclude_filter, ['*test*','splat*','blah/*'])
+
+    def test_050_310_invalid_option(self):
+        """Test that the manifest section with an invalid hash value is detected"""
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+    [filters]
+    blah = gibberish
+        """)
+            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid config line in section \[filters\] : \'blah = gibberish\' on line 2'):
+                env = processor.ManifestProcessor()
+
+class TestReportsConfig(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def test_050_400_skipped_true(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        skipped = true
+            """)
+            env = processor.ManifestProcessor()
+            self.assertTrue(env._report_skipped)
+
+    def test_050_401_skipped_yes(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        skipped = yes
+            """)
+            env = processor.ManifestProcessor()
+            self.assertTrue(env._report_skipped)
+
+    def test_050_402_skipped_no(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        skipped = no
+            """)
+            env = processor.ManifestProcessor()
+            self.assertFalse(env._report_skipped)
+
+    def test_050_403_skipped_false(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        skipped = false
+            """)
+            env = processor.ManifestProcessor()
+            self.assertFalse(env._report_skipped)
+
+    def test_050_420_mismatch_true(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        mismatch = true
+            """)
+            env = processor.ManifestProcessor()
+            self.assertTrue(env._report_mismatch)
+
+    def test_050_421_mismatch_yes(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        mismatch = yes
+            """)
+            env = processor.ManifestProcessor()
+            self.assertTrue(env._report_mismatch)
+
+    def test_050_422_mismatch_no(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        mismatch = no
+            """)
+            env = processor.ManifestProcessor()
+            self.assertFalse(env._report_mismatch)
+
+    def test_050_423_mismatch_false(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        mismatch = false
+            """)
+            env = processor.ManifestProcessor()
+            self.assertFalse(env._report_mismatch)
+
+    def test_050_440_missing_true(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        missing = true
+            """)
+            env = processor.ManifestProcessor()
+            self.assertTrue(env._report_missing)
+
+    def test_050_441_missing_yes(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        missing = yes
+            """)
+            env = processor.ManifestProcessor()
+            self.assertTrue(env._report_missing)
+
+    def test_050_442_missing_no(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        missing = no
+            """)
+            env = processor.ManifestProcessor()
+            self.assertFalse(env._report_missing)
+
+    def test_050_443_missing_false(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        missing = false
+            """)
+            env = processor.ManifestProcessor()
+            self.assertFalse(env._report_missing)
+
+    def test_050_460_extra_true(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        extra = true
+            """)
+            env = processor.ManifestProcessor()
+            self.assertTrue(env._report_extra)
+
+    def test_050_461_extra_yes(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        extra = yes
+            """)
+            env = processor.ManifestProcessor()
+            self.assertTrue(env._report_extra)
+
+    def test_050_462_extra_no(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        extra = no
+            """)
+            env = processor.ManifestProcessor()
+            self.assertFalse(env._report_extra)
+
+    def test_050_463_extra_false(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        extra = false
+            """)
+            env = processor.ManifestProcessor()
+            self.assertFalse(env._report_extra)
+
+    def test_050_480_extension_true(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        extension = true
+            """)
+            env = processor.ManifestProcessor()
+            self.assertTrue(env._report_extension)
+
+    def test_050_481_extension_yes(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        extension = yes
+            """)
+            env = processor.ManifestProcessor()
+            self.assertTrue(env._report_extension)
+
+    def test_050_482_extension_no(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        extension = no
+            """)
+            env = processor.ManifestProcessor()
+            self.assertFalse(env._report_extension)
+
+    def test_050_483_extension_false(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        extension = false
+            """)
+            env = processor.ManifestProcessor()
+            self.assertFalse(env._report_extension)
+
+    def test_050_490_verbose_zero(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        verbose = 0
+            """)
+            env = processor.ManifestProcessor()
+            self.assertEqual(env._verbose, 0)
+
+    def test_050_491_verbose_one(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        verbose = 1
+            """)
+            env = processor.ManifestProcessor()
+            self.assertEqual(env._verbose, 1)
+
+    def test_050_492_verbose_two(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        verbose = 2
+            """)
+            env = processor.ManifestProcessor()
+            self.assertEqual(env._verbose, 2)
+
+    def test_050_493_verbose_three(self):
+        with Patcher() as patcher:
+            os.chdir('/tmp')
+            patcher.fs.CreateFile('manifest.cfg', contents="""
+        [reports]
+        verbose = 3
+            """)
+            env = processor.ManifestProcessor()
+            self.assertEqual(env._verbose, 3)
+
+
+class TestCases(unittest.TestCase):
+    def setUp(self):
+        pass
+
+    def tearDown(self):
+        pass
+
+    def test_000_000_something(self):
+        pass
+
 
 # noinspection PyMissingOrEmptyDocstring,PyUnusedLocal
 def load_tests(loader, tests=None, patterns=None,excludes=None):

@@ -19,8 +19,8 @@ __created__ = '22 Mar 2016'
 
 import hashlib
 
-DEFAULT_EXTENSIONS = [u'.py', u'.html', u'.txt', u'.css', u'.js', u'.gif', u'.png', u'.jpg', u'.jpeg']
-DEFAULT_IGNOREDIRECTORY = [u'static', u'htmlcov', u'media',u'build', u'dist', u'docs']
+DEFAULT_EXTENSIONS = {u'.py', u'.html', u'.txt', u'.css', u'.js', u'.gif', u'.png', u'.jpg', u'.jpeg'}
+DEFAULT_IGNOREDIRECTORY = {u'static', u'htmlcov', u'media',u'build', u'dist', u'docs'}
 DEFAULT_MANIFEST_FILE = 'manifest.txt'
 DEFAULT_CONFIG_FILE = 'manifest.cfg'
 DEFAULT_HASH = 'sha224' if 'sha224' in hashlib.algorithms_available else list(hashlib.algorithms_available)[0]
