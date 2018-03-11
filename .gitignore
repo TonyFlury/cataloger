@@ -1,1 +1,10 @@
-# Created by .ignore support plugin (hsz.mobi)
+.tox/**
+build/**
+coverage_html_report/**
+dist/**
+docs/_build/**
+docs/_static/**
+.coverage
+.idea/**
+manifest_checker.egg-info/**
+manifest.txt
