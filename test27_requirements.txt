@@ -1,6 +1,6 @@
 click
 tox
-TempDirectoryContext
 pyfakefs
 mock
 six
+templatelite

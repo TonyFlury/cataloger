@@ -14,7 +14,7 @@ import hashlib
 import defaults
 import pkg_resources
 
-from . import version
+from manifest_checker import version
 import commands
 
 

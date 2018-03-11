@@ -30,7 +30,7 @@ _author__ = 'Tony Flury : anthony.flury@btinternet.com'
 __created__ = '22 Mar 2016'
 
 
-class ManifestError(Exception):
+class CatalogError(Exception):
     """An Error which occurs during the processing of the Manifest file"""
     pass
 
@@ -40,7 +40,7 @@ class ConfigError(Exception):
     pass
 
 
-class ManifestProcessor(object):
+class Cataloger(object):
     """General class for processing the manifest file
 
         Implements the low level API as documented and
@@ -194,11 +194,15 @@ class ManifestProcessor(object):
                 the file doesn't exist - execution continues as if the config
                 file is empty.
         """
+        for section, section_data in self.config_sections_and_attrs.items():
+            for option, attr_data in section_data.items():
+                name, default = attr_data
+                setattr(self, name, default)
         # Set the defaults for each attribute in each section
-        map(lambda (n, d): setattr(self, n, d),
-            [(attr_name, default) for section in self.config_sections_and_attrs
-             for opt, (attr_name, default) in
-             self.config_sections_and_attrs[section].items()])
+        # map(lambda n_d: setattr(self, n_d[0], n_d[1]),
+        #     [n_d for section in self.config_sections_and_attrs
+        #      for opt, n_d in
+        #      self.config_sections_and_attrs[section].items()])
 
         self._config = kwargs.get('conifg', 'manifest.cfg')
         self._config = 'manifest.cfg' if not self._config else self._config
@@ -232,7 +236,7 @@ class ManifestProcessor(object):
         self._extensions |= set(kwargs.get('add_extension', []))
 
         if not self._extensions:
-            raise ManifestError(
+            raise CatalogError(
                 'No file extensions given to catalogue or check')
 
         self._ignore_directories = set(
@@ -252,7 +256,6 @@ class ManifestProcessor(object):
         # Internal attributes for counting skipped files, etc.
         self._skipped_file_count = 0  # Skipped files are only a count
         self._manifest_data_count = 0  # Files output to manifest
-        self._missing_files = []  # List of files that are missed
         self._extra_files = []  # List of files that are record_extra
         self._mismatched_files = []  # List of mismatched files
         self._extension_counts = {}  # Count of each file extension
@@ -283,35 +286,45 @@ class ManifestProcessor(object):
         return self._manifest_name
 
     @property
+    def processed_count(self):
+        return self._manifest_data_count
+
+    @property
     def skipped_files(self):
-        """The list of files skipped due to exclude filters etc """
-        return self._skipped_files
+        """The list of those files skipped due to exclude filters"""
+        return self._files_by_status('skipped')
 
     @property
     def mismatched_files(self):
         """The list of mismatched files
             those where the signatures do not match
         """
-        return self._mismatched_files
+        return self._files_by_status('mismatch')
 
     @property
     def extra_files(self):
         """The list of extra files
             those that exist locally but not in the manifest"""
-        return self._extra_files
+        return self._files_by_status('extra')
 
     @property
     def missing_files(self):
         """The list of missing files
-
             those that exist in the manifest but not locally"""
-        return self._missing_files
+        return self._files_by_status('missing')
+
+
+    def _files_by_status(self, status):
+        return [file_name if directory == '.'
+                            else os.path.join(directory, file_name)
+                for directory, files in self._manifest_data.items()
+                    for file_name in files
+                        if files[file_name]['processed'] == status]
 
     @property
     def extension_counts(self):
         """A generator of tuples of the file extensions and their counts"""
-        return ((name, count) for name, count in
-                self._extension_counts.items())
+        return self._extension_counts
 
     def _read_config(self, explicit_config_file=False):
         """A generator for the lines in the config file
@@ -355,7 +368,7 @@ class ManifestProcessor(object):
             # Some other IOError - case 4 -likely a catch all
             six.raise_from(ConfigError(
                 'Unable to read config file \'{}\' : {}'.format(
-                    self._config, e.strerror)), None)
+                    self._config, str(e))), None)
 
     def _process_config(self, explicit_config_file=False):
         """Process the config file
@@ -434,7 +447,7 @@ class ManifestProcessor(object):
             else:
                 try:
                     value = int(value)
-                except ValueError as e:
+                except ValueError:
                     six.raise_from(ConfigError(
                         'Invalid value in section [reports] :'
                         ' \'{}\' on line {}'.format(
@@ -466,12 +479,13 @@ class ManifestProcessor(object):
 
         direct = direct if direct != {''} else set()
 
-        # Identify null strings or strings which are just dots
-        if any(d == '' for d in direct):
-            six.raise_from(ConfigError(
-                'Invalid value in [directories] section :'
-                ' \'{}\' on line {}'.format(
-                    line, line_no)), None)
+        if direct:
+            # Identify null strings or strings which are just dots
+            if any(d == '' for d in direct):
+                six.raise_from(ConfigError(
+                    'Invalid value in [directories] section :'
+                    ' \'{}\' on line {}'.format(
+                        line, line_no)), None)
 
         self._config_operator_list_modifiers(
             attr_name, direct, line, line_no, op, 'directories')
@@ -492,19 +506,22 @@ class ManifestProcessor(object):
 
         op, ext = line[0], set(e.strip() for e in line[1:].strip().split(','))
 
-        # Identify null strings or strings which are just dots
-        if any(len(e) <= 1 for e in ext):
-            six.raise_from(ConfigError(
-                'Invalid value in [extension] section :'
-                ' \'{}\' on line {}'.format(
-                    line, line_no)), None)
+        ext = ext if ext != {''} else set()
 
-        # Identify extension values without a leading dot
-        if any(e[0] != '.' for e in ext):
-            six.raise_from(ConfigError(
-                'Invalid value in [extension] section :'
-                ' \'{}\' on line {}'.format(
-                    line, line_no)), None)
+        if ext:
+            # Identify null strings or strings which are just dots
+            if any(len(e) <= 1 for e in ext):
+                six.raise_from(ConfigError(
+                    'Invalid value in [extension] section :'
+                    ' \'{}\' on line {}'.format(
+                        line, line_no)), None)
+
+            # Identify extension values without a leading dot
+            if any(e[0] != '.' for e in ext):
+                six.raise_from(ConfigError(
+                    'Invalid value in [extension] section :'
+                    ' \'{}\' on line {}'.format(
+                        line, line_no)), None)
 
         self._config_operator_list_modifiers(
             attr_name, ext, line, line_no, op, 'extension')
@@ -555,15 +572,6 @@ class ManifestProcessor(object):
             option, _, value = (x.strip() for x in line.partition('='))
             setattr(self, attrs_options[option][0],
                     set(x.strip() for x in value.split(',')))
-            try:
-                getattr(self, '_config_validate_' + option)(line, line_no,
-                                                            value)
-            except ConfigError as e:
-                # Exception from the validation
-                six.reraise(e, None)
-            except AttributeError:
-                # Validation function doesn't exist - no problems here
-                return
         except KeyError:
             # Error from finding the relevant atrribute name in the config dict
             six.raise_from(ConfigError(
@@ -586,8 +594,8 @@ class ManifestProcessor(object):
             try:
                 getattr(self, '_config_validate_' + option)(line, line_no,
                                                             value)
-            except ConfigError as e:
-                six.reraise(e, None)
+            except ConfigError:
+                raise
             except AttributeError:
                 return
         except KeyError:
@@ -600,9 +608,9 @@ class ManifestProcessor(object):
     def _config_validate_hash(line, line_no, value):
         """Helper funvtion to validate the hash """
         if value not in hashlib.algorithms_available:
-            raise ConfigError(
+            raise six.raise_from(ConfigError(
                 'Invalid value for hash :'
-                ' \'{}\' on line {}'.format(line, line_no))
+                ' \'{}\' on line {}'.format(line, line_no)),None)
 
     def _start_command(self):
         """Internal method to trigger the appropriate opening of the manifest file
@@ -612,53 +620,27 @@ class ManifestProcessor(object):
 
         On a create action; the manifest is open to write
         """
-
-        if self._action == 'create':
-            # Should we open late.
-
-            try:
-                self._manifest_fp = open(self._manifest_name, 'w')
-            except IOError as e:
-                six.raise_from(ManifestError(
-                    'Error opening manifest file : {} - {}'.format(
-                        self._manifest_name, str(e))), None)
-        elif self._action == 'check':
+        if self._action == 'check':
             try:
                 with open(self._manifest_name, 'r') as self._manifest_fp:
                     self._load_manifest()
             except IOError as e:
-                six.raise_from(ManifestError(
+                six.raise_from(CatalogError(
                     'Error opening manifest file : {} - {}'.format(
                         self._manifest_name, str(e))), None)
-            except ManifestError as e:
+            except CatalogError as e:
                 raise
             finally:
                 self._manifest_fp = None
-        else:
+        elif self._action != 'create':
             six.raise_from(ValueError(
                 'Invalid value for subcommand: {}'.format(self._action)), None)
-
-    def __enter__(self):
-        """Prototype for context manager - to be tested"""
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit for manifest file - ensure that the manifest file is closed."""
-        if self._manifest_fp is not None:
-            self._manifest_fp.close()
-
-        if exc_type:
-            return False
 
     def _load_manifest(self):
         """Load the given manifest file, and analyse into a dictionary
             Top Level dict:  key is directory, value is 2nd level dictionary
                 2nd level dictionary : key is file_name, value is signature
         """
-        if not self._manifest_fp:
-            raise ManifestError(
-                'Manifest not loaded: action=\'check\' must be provided')
-
         for line_num, entry in enumerate(self._manifest_fp):
             entry = entry.strip()
 
@@ -666,7 +648,7 @@ class ManifestProcessor(object):
                 continue
 
             if '\t' not in entry:
-                six.raise_from(ManifestError(
+                six.raise_from(CatalogError(
                     'Invalid manifest format - missing tab on line {}'.format(
                         line_num)), None)
 
@@ -677,7 +659,7 @@ class ManifestProcessor(object):
             dirlist = self._manifest_data.setdefault(directory, {})
 
             if any(True for x in signature if x not in string.hexdigits):
-                six.raise_from(ManifestError(
+                six.raise_from(CatalogError(
                     'Invalid manifest format -'
                     ' invalid signature on line {}'.format(
                         line_num)), None)
@@ -688,7 +670,7 @@ class ManifestProcessor(object):
             self._manifest_data_count += 1
         else:
             if self._manifest_data_count == 0:
-                six.raise_from(ManifestError(
+                six.raise_from(CatalogError(
                     'Empty manifest file : {}'.format(self._manifest_name)),
                     None)
             else:
@@ -701,22 +683,18 @@ class ManifestProcessor(object):
         if directory == self._root and file_name == self._manifest_name:
             return False
 
+        full = os.path.join(directory, file_name)
+
         # Check any filters
         if self._exclude_filter:
-
-            full = os.path.join(directory, file_name)
 
             # Does the full path match any filter ?
             if any(fnmatch.fnmatch(full, pat) for pat in self._exclude_filter):
                 return False
 
         if self._include_filter:
-
-            full = os.path.join(directory, file_name)
-
-            # Does the full path match all inclusion filters ?
-            if any(not fnmatch.fnmatch(full, pat) for pat in
-                   self._include_filter):
+            if all(not fnmatch.fnmatch(full, pat) for pat in
+                    self._include_filter):
                 return False
 
         # check extensions
@@ -731,92 +709,35 @@ class ManifestProcessor(object):
     def _record_extension(self, path):
         """Record a count of each extension encountered"""
         ext = os.path.splitext(path)[1]
-        self._extension_counts[ext] = self._extension_counts.setdefault(ext,
-                                                                        0) + 1
+        self._extension_counts[ext] = self._extension_counts.setdefault(ext,0) + 1
 
-    def manifest_write(self, rel_path, signature):
-        """Enter the file into the manifest"""
+    def manifest_add(self, rel_path, signature):
+        """Add data to the manifest"""
+        directory, file_name = os.path.split(rel_path)
+        d_data = self._manifest_data.setdefault(directory,{})
+        d_data[file_name] = {'signature':signature,
+                                        'processed':'added'}
 
-        self._manifest_fp.write(
-            '{path}\t{signature}\n'.format(path=rel_path, signature=signature))
         self._manifest_data_count += 1
-
         self._record_extension(rel_path)
 
-    def _final_create(self):
-        """Wrap up the manifest creation process
+    def manifest_write(self):
+        """Write the file data into the manifest"""
 
-            Report the number of files processed, files skipped
-            and report files by file extension
-        """
-
-        if self._verbose == 0:
-            return
-
-        self._output.write(
-            '{} files processed'.format(self._manifest_data_count))
-        if self._report_skipped:
-            self._output.write(
-                ' - {} files skipped\n'.format(self._skipped_file_count))
-        else:
-            self._output.write('\n')
-
-        if self._report_extension:
-            self._output.write('Processed by file type\n')
-            for ext, count in self._extension_counts.iteritems():
-                self._output.write("\t'{}' : {}\n".format(ext, count))
-
-        if self._manifest_fp:
-            self._manifest_fp.close()
-
-    def _final_check(self):
-        """Wrap up the Check process
-
-           Output the number of files processed, skipped, file extension count
-           Output mismatches, missing and record_extra files as appropriate.
-        """
-        if self._verbose == '0':
-            return
-
-        self._output.write(
-            '{} files processed'.format(self._manifest_data_count))
-        if self._report_skipped:
-            self._output.write(
-                ' - {} files skipped\n'.format(self._skipped_file_count))
-        else:
-            self._output.write('\n')
-
-        if self._report_extension:
-            self._output.write('Processed by file type\n')
-            for ext, count in self.extension_counts:
-                self._output.write("\t'{}' : {}\n".format(ext, count))
-
-        if self._report_mismatch:
-            self._output.write("{} files with mismatched signatures\n".format(
-                len(self.mismatched_files)))
-            if self._group:
-                for f in self.mismatched_files:
-                    self._output.write('\t{}\n'.format(f))
-
-        if self._report_missing:
-            self._output.write(
-                "{} missing files\n".format(len(self.missing_files)))
-            if self._group:
-                for f in self.missing_files:
-                    self._output.write('\t{}\n'.format(f))
-
-        if self._report_extra:
-            self._output.write(
-                "{} extra files\n".format(len(self.extra_files)))
-            if self._group:
-                for f in self.extra_files:
-                    self._output.write('\t{}\n'.format(f))
-
-    def final_report(self):
-        """Close out the command"""
-        jump_table = {'create': self._final_create, 'check': self._final_check}
-
-        jump_table[self._action]()
+        try:
+            with open(self._manifest_name, 'w') as manifest_fp:
+                for directory, files in self._manifest_data.items():
+                    for file_name, data in self._manifest_data[directory].items():
+                        if data.get('processed',False) not in ['added']:
+                            continue
+                        manifest_fp.write(
+                '{path}\t{signature}\n'.format(
+                        path=os.path.join(directory, file_name),
+                        signature=self._manifest_data[directory][file_name]['signature']))
+        except IOError as e:
+                six.raise_from(CatalogError(
+                    'Error opening/writing manifest file : \'{}\' - {}'.format(
+                        self._manifest_name, str(e))), None)
 
     def abs_path(self, rel_path):
         """Return an absolute path from a relative path
@@ -901,7 +822,7 @@ class ManifestProcessor(object):
         m = hashlib.new(self._hash)
         try:
             with open(abs_path, 'r') as f:
-                m.update(f.read())
+                m.update(bytearray(f.read(),'utf-8'))
         except BaseException as e:
             sys.stderr.write(
                 "Error creating signature for '{}': {}\n".format(abs_path, e))
@@ -911,55 +832,36 @@ class ManifestProcessor(object):
     def _path_rel_to_root(self, abspath):
         return os.path.relpath(abspath, self._root)
 
-    def record_skipped(self, directory, file_name):
-        """Count the and Record the skipped files"""
-        self._skipped_file_count += 1
-        self._skipped_files.append(os.path.join(directory, file_name))
-
     def mark_processed(self, rel_path, status='processed'):
         """Mark a file as having been processed"""
-        if not self._manifest_data:
+        directory, file_name = os.path.split(rel_path)
+        self._manifest_data.setdefault(directory, {})
+        self._manifest_data[directory].setdefault(file_name, {})
+        self._manifest_data[directory][file_name]['processed'] = status
+
+    def record_skipped(self, directory, file_name):
+        """Count the and Record the skipped files"""
+
+        # Don't record the manifest file itself as being skipped
+        if (self.abs_path(directory) == self.abs_path(self._root) and
+                file_name == self._manifest_name):
             return
 
-        directory, file_name = os.path.split(rel_path)
-        if directory not in self._manifest_data or \
-                file_name not in self._manifest_data[directory]:
-            return
-        else:
-            self._manifest_data[directory][file_name]['processed'] = status
+        self._skipped_file_count += 1
+
+        self.mark_processed(os.path.join(directory,file_name), 'skipped')
+#        self._skipped_files.append(os.path.join(directory, file_name))
 
     def record_missing(self, rel_path):
-
         self._record_extension(rel_path)
-
-        self.missing_files.append(self._path_rel_to_root(rel_path))
-
-        if not self._group and self._verbose != '0':
-            sys.stdout.write(
-                "MISSING : '{}'\n".format(self._path_rel_to_root(rel_path)))
-
         self.mark_processed(rel_path, 'missing')
 
     def record_extra(self, rel_path):
-
         self._record_extension(rel_path)
-
         self.extra_files.append(self._path_rel_to_root(rel_path))
-
-        if not self._group and self._verbose != '0':
-            sys.stdout.write(
-                "EXTRA : '{}'\n".format(self._path_rel_to_root(rel_path)))
-
         self.mark_processed(rel_path, 'extra')
 
     def record_mismatch(self, rel_path):
-
         self._record_extension(rel_path)
-
         self.mismatched_files.append(self._path_rel_to_root(rel_path))
-
-        if not self._group and self._verbose != '0':
-            sys.stdout.write(
-                "MISMATCH : '{}'\n".format(self._path_rel_to_root(rel_path)))
-
         self.mark_processed(rel_path, 'mismatch')

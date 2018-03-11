@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 """
-# SuffolkCycleDjango : Implementation of check_manifest.py
+# manifest_check : Implementation of create and check commands
 
 Summary : 
     <summary of module/class being implemented>
@@ -36,13 +36,29 @@ __created__ = '09 Feb 2016'
 def check(ctx, **kwargs ):
     ctx.obj.update(kwargs)
 
-    check_manifest(**ctx.obj)    # Indirect method to allow for API call
+    env = check_catalog(**ctx.obj)    # Indirect method to allow for API call
 
+    report = Renderer( template_file=os.path.join(os.path.dirname(__file__,),
+                        'templates','final_check.tmpl'),
+                       remove_indentation=False).from_context(
+                            {'processed_count':env.processed_count},
+                           {'report_skipped': env._report_skipped,
+                            'skipped_files':env.skipped_files},
+                           {'report_extension': env._report_extension,
+                            'extensions':env.extension_counts},
+                           {'report_mismatch' : env._report_mismatch,
+                            'mismatched': env.mismatched_files},
+                            {'report_missing' : env._report_missing,
+                             'missing': env.missing_files},
+                            {'report_extra': env._report_extra,
+                                'extra': env.extra_files}, )
 
-def check_manifest(**kwargs):
+    kwargs.get('output', sys.stdout).write(report)
+
+def check_catalog(**kwargs):
     try:
-        env = environment.ManifestProcessor(action='check', **kwargs)
-    except environment.ManifestError as e:
+        env = environment.Cataloger(action='check', **kwargs)
+    except environment.CatalogError as e:
         sys.stderr.write("Unable to read manifest file '{}' : {}\n".format(
                 kwargs.get('manifest',defaults.DEFAULT_MANIFEST_FILE), e))
         sys.exit(1)
@@ -72,39 +88,35 @@ def check_manifest(**kwargs):
             for file in env.get_non_processed(directory):
                 env.record_missing(os.path.join(directory, file))
 
-    report = Renderer( template_file=os.path.join(os.path.dirname(__file__,),'templates','final_check.tmpl'),
-                       remove_indentation=False).from_context(
-                           {'report_skipped': env._report_skipped,
-                            'skipped_files':env.skipped_files},
-                           {'report_extension': env._report_extension,
-                            'extensions':env.extension_counts},
-                           {'report_mismatch' : env._report_mismatch,
-                            'mismatched': env.mismatched_files},
-                            {'report_missing' : env._report_missing,
-                             'missing': env.missing_files},
-                            {'report_extra': env._report_extra,
-                                'extra': env.extra_files}, )
+    return env
 
-    kwargs.get('output', sys.stdout).write(report)
-
-    print('-'*80)
-
-    env.final_report()
 
 @click.command('create', help='Create a new manifest')
 @click.pass_context
 def create(ctx, **kwargs):
     ctx.obj.update(kwargs)
-    create_manifest(**ctx.obj)
+    env = create_catalog(**ctx.obj)
 
-def create_manifest(**kwargs):
+    report = Renderer( template_file=os.path.join(os.path.dirname(__file__),'templates','final_create.tmpl'),
+                       remove_indentation=False).from_context(
+                           {'processed_count': env.processed_count},
+                           {'report_skipped': env._report_skipped,
+                            'skipped_files':env.skipped_files},
+                           {'report_extension': env._report_extension,
+                            'extensions':env.extension_counts} )
 
-    env = environment.ManifestProcessor( action='create', **kwargs )
+    kwargs.get('output', sys.stdout).write(report)
+
+def create_catalog(**kwargs):
+
+    env = environment.Cataloger(action='create', **kwargs)
 
     for directory, files in env.walk():
         for file in files:
             signature = env.get_signature( rel_path=os.path.join(directory, file) )
             if signature:
-                env.manifest_write(rel_path=os.path.join(directory, file), signature=signature)
+                env.manifest_add(rel_path=os.path.join(directory, file), signature=signature)
 
-    env.final_report()
+    env.manifest_write()
+
+    return env

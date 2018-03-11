@@ -13,6 +13,8 @@
 
   
   
+  
+  
 
   
 
@@ -30,6 +32,9 @@
   
 
   
+        <link rel="index" title="Index"
+              href="genindex.html"/>
+        <link rel="search" title="Search" href="search.html"/>
     <link rel="top" title="manifest-checker 0.0.1 documentation" href="#"/>
         <link rel="next" title="Getting Started" href="GettingStarted.html"/> 
 
@@ -40,6 +45,7 @@
 
 <body class="wy-body-for-nav" role="document">
 
+   
   <div class="wy-grid-for-nav">
 
     
@@ -80,9 +86,14 @@
           
             
             
-                <ul>
+              
+            
+            
+              <ul>
 <li class="toctree-l1"><a class="reference internal" href="GettingStarted.html">Getting Started</a></li>
 <li class="toctree-l1"><a class="reference internal" href="CommandLineOptions.html">Command Line Options</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configuration file settings</a></li>
+<li class="toctree-l1"><a class="reference internal" href="ExtraInfo.html">Extra Information</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Defaults.html">Defaults</a></li>
 </ul>
 
@@ -96,8 +107,10 @@
 
       
       <nav class="wy-nav-top" role="navigation" aria-label="top navigation">
-        <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
-        <a href="#">manifest-checker</a>
+        
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="#">manifest-checker</a>
+        
       </nav>
 
 
@@ -110,19 +123,36 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
 <div role="navigation" aria-label="breadcrumbs navigation">
+
   <ul class="wy-breadcrumbs">
-    <li><a href="#">Docs</a> &raquo;</li>
-      
-    <li>Manifest Checker</li>
+    
+      <li><a href="#">Docs</a> &raquo;</li>
+        
+      <li>Manifest Checker</li>
+    
+    
       <li class="wy-breadcrumbs-aside">
         
-          
-            <a href="_sources/index.txt" rel="nofollow"> View page source</a>
+            
+            <a href="_sources/index.rst.txt" rel="nofollow"> View page source</a>
           
         
       </li>
+    
   </ul>
+
+  
   <hr/>
 </div>
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
@@ -131,7 +161,7 @@
   <div class="section" id="manifest-checker">
 <h1>Manifest Checker<a class="headerlink" href="#manifest-checker" title="Permalink to this headline">¶</a></h1>
 <img alt="https://readthedocs.org/projects/manifest-checker/badge/?version=latest" src="https://readthedocs.org/projects/manifest-checker/badge/?version=latest" />
-<table class="docutils field-manifest_write" frame="void" rules="none">
+<table class="docutils field-list" frame="void" rules="none">
 <col class="field-name" />
 <col class="field-body" />
 <tbody valign="top">
@@ -146,11 +176,11 @@
 <p>During the check phase - the suite will report against :</p>
 <ul class="simple">
 <li>files which have different checksums in the destination directory tree compared to manifest file - i.e. the files are likely to be different.</li>
-<li>files which are missing from the destination directory tree but which have a checksum within the manifest file - i.e. files which haven&#8217;t been deployed at all.</li>
+<li>files which are missing from the destination directory tree but which have a checksum within the manifest file - i.e. files which haven’t been deployed at all.</li>
 <li>files which exist in the destination tree but which are missing from the manifest file - these record_extra files may impact the behaviour of the deployed code.</li>
 </ul>
 <p>These are called exceptions - and using the right command options you can control which exception result in failures</p>
-<p>The manifest checker has <a class="reference internal" href="Defaults.html"><em>default options</em></a> which are ideal for checking deployment of a Django deployment, but it can be configured either by command line to look in other places, or other file types.</p>
+<p>The manifest checker has <a class="reference internal" href="Defaults.html"><span class="doc">default options</span></a> which are ideal for checking deployment of a Django deployment, but it can be configured either by command line to look in other places, or other file types.</p>
 <p>If you use non default configuration options on the command line to create your manifest, then you will need to ensure that you use the same options when you execute the checker against your destination, to ensure that the right files are checked.</p>
 <div class="admonition note">
 <p class="first admonition-title">Note</p>
@@ -165,8 +195,18 @@ If you do find an error - please report the problem on :</p>
 </div>
 <div class="toctree-wrapper compound">
 <ul>
-<li class="toctree-l1"><a class="reference internal" href="GettingStarted.html">Getting Started</a></li>
+<li class="toctree-l1"><a class="reference internal" href="GettingStarted.html">Getting Started</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="GettingStarted.html#installation">Installation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="GettingStarted.html#simple-usage">Simple Usage</a></li>
+</ul>
+</li>
 <li class="toctree-l1"><a class="reference internal" href="CommandLineOptions.html">Command Line Options</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configuration file settings</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="config.html#sections">Sections</a></li>
+<li class="toctree-l2"><a class="reference internal" href="config.html#reports">Reports</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="ExtraInfo.html">Extra Information</a></li>
 <li class="toctree-l1"><a class="reference internal" href="Defaults.html">Defaults</a></li>
 </ul>
 </div>
@@ -174,12 +214,15 @@ If you do find an error - please report the problem on :</p>
 
 
            </div>
+           <div class="articleComments">
+            
+           </div>
           </div>
           <footer>
   
     <div class="rst-footer-buttons" role="navigation" aria-label="footer navigation">
       
-        <a href="GettingStarted.html" class="btn btn-neutral float-right" title="Getting Started" accesskey="n">Next <span class="fa fa-arrow-circle-right"></span></a>
+        <a href="GettingStarted.html" class="btn btn-neutral float-right" title="Getting Started" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right"></span></a>
       
       
     </div>
@@ -214,7 +257,8 @@ If you do find an error - please report the problem on :</p>
             VERSION:'0.0.1',
             COLLAPSE_INDEX:false,
             FILE_SUFFIX:'.html',
-            HAS_SOURCE:  true
+            HAS_SOURCE:  true,
+            SOURCELINK_SUFFIX: '.txt'
         };
     </script>
       <script type="text/javascript" src="_static/jquery.js"></script>
