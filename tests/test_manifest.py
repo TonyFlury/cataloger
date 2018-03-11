@@ -31,7 +31,8 @@ import manifest_checker.processor as processor
 import manifest_checker.defaults as defaults
 import manifest_checker.commands as commands
 
-from new_mock_open import new_mock_open
+from tests.new_mock_open import new_mock_open
+
 import six
 
 if six.PY2:
