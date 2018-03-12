@@ -2,7 +2,7 @@
 
 {% if report_extension %}
 Files processed by file types:
-    {% for extension, count in extensions %}
+    {% for extension, count in extensions%}
     {{ extension }} : {{ count }}
     {% endfor %}
 {% endif %}

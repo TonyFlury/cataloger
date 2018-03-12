@@ -1,5 +1,5 @@
 ================
-Manifest Checker
+Cataloger
 ================
 
 .. image:: https://readthedocs.org/projects/manifest-checker/badge/?version=latest

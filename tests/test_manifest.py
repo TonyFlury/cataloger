@@ -175,82 +175,81 @@ class TestSignatureCreation(unittest.TestCase):
     def test_010_000_default_hash(self):
         """Assume a default command - i.e. no arguments other than create"""
 
-        sample_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
+        sample_text = b'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
 
         cmd = processor.Cataloger(action='create')
 
         with patch('manifest_checker.processor.open',
                    mock_open(read_data=sample_text)) as m:
             this_signature = cmd.get_signature('a.py')
-            m.assert_has_calls([call('./a.py', 'r')])
+            m.assert_has_calls([call('./a.py', 'rb')])
             call_names = set(x[0] for x in m.return_value.mock_calls)
             self.assertTrue( 'close' in call_names or
                              ('__enter__' in call_names and '__exit__' in call_names))
 
         non_lib_sig = hashlib.new(defaults.DEFAULT_HASH)
-        non_lib_sig.update(bytearray(sample_text,'utf-8'))
+        non_lib_sig.update(sample_text)
         self.assertEqual(this_signature, non_lib_sig.hexdigest().strip())
 
     def test_010_001_sha1_hash_creation(self):
         """Assume a explicit create an sha1 hash"""
 
-        sample_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
+        sample_text = b'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
 
         cmd = processor.Cataloger(action='create', hash='sha1')
 
         with patch('manifest_checker.processor.open',
                    mock_open(read_data=sample_text)) as m:
             this_signature = cmd.get_signature('a.py')
-            m.assert_has_calls([call('./a.py', 'r')])
+            m.assert_has_calls([call('./a.py', 'rb')])
             call_names = set(x[0] for x in m.return_value.mock_calls)
             self.assertTrue( 'close' in call_names or
                              ('__enter__' in call_names and '__exit__' in call_names))
 
         non_lib_sig = hashlib.new('sha1')
-        non_lib_sig.update(bytearray(sample_text,'utf-8'))
+        non_lib_sig.update(sample_text)
         self.assertEqual(this_signature, non_lib_sig.hexdigest().strip())
 
     def test_010_002_sha224_hash_creation(self):
         """Assume a explicit create an sha224 hash"""
 
-        sample_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
+        sample_text = b'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
 
         cmd = processor.Cataloger(action='create', hash='sha224')
 
         with patch('manifest_checker.processor.open',
                    mock_open(read_data=sample_text)) as m:
             this_signature = cmd.get_signature('a.py')
-            m.assert_has_calls([call('./a.py', 'r')])
+            m.assert_has_calls([call('./a.py', 'rb')])
             call_names = set(x[0] for x in m.return_value.mock_calls)
             self.assertTrue( 'close' in call_names or
                              ('__enter__' in call_names and '__exit__' in call_names))
 
         non_lib_sig = hashlib.new('sha224')
-        non_lib_sig.update(bytearray(sample_text,'utf-8'))
+        non_lib_sig.update(sample_text)
         self.assertEqual(this_signature, non_lib_sig.hexdigest().strip())
 
     def test_010_003_sha384_hash_creation(self):
         """Explicit create an sha384 hash"""
         cmd = processor.Cataloger(hash='sha384')
-        sample_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
+        sample_text = b'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
 
         with patch('manifest_checker.processor.open',
-                   mock_open(read_data=                             sample_text,
-                             )) as m:
+                   mock_open(read_data=sample_text,)) as m:
             this_signature = cmd.get_signature('a.py')
-            m.assert_has_calls([call('./a.py', 'r')])
+            m.assert_has_calls([call('./a.py', 'rb')])
             call_names = set(x[0] for x in m.return_value.mock_calls)
             self.assertTrue( 'close' in call_names or
                              ('__enter__' in call_names and '__exit__' in call_names))
 
         non_lib_sig = hashlib.new('sha384')
-        non_lib_sig.update(bytearray(sample_text,'utf-8'))
+        non_lib_sig.update(sample_text)
         self.assertEqual(this_signature, non_lib_sig.hexdigest().strip())
 
     def test_010_010_hash_creation_error_on_open(self):
         """Generate an error while opening a file to create a hash"""
         cmd = processor.Cataloger(hash='sha384')
-        sample_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
+        sample_text = b'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
 
         with patch('manifest_checker.processor.open',
                    mock_open(read_data=sample_text)) as m:
@@ -259,13 +258,13 @@ class TestSignatureCreation(unittest.TestCase):
                 this_signature = cmd.get_signature('a.py')
                 self.assertEqual(err.getvalue(),'Error creating signature for '
                                                 '\'./a.py\': [Errno 1] No permission\n')
-                m.assert_has_calls([call('./a.py', 'r')])
+                m.assert_has_calls([call('./a.py', 'rb')])
                 # Exception will be raised on open - so no need to test for closure
 
     def test_010_012_hash_creation_error_on_read(self):
         """Generate an error while reading a file to create a hash"""
         cmd = processor.Cataloger(hash='sha384')
-        sample_text = 'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
+        sample_text = b'Lorem ipsum dolor sit amet, consectetur adipiscing elit'
 
         with patch('manifest_checker.processor.open',
                    mock_open(read_data=sample_text)) as m:
@@ -274,7 +273,7 @@ class TestSignatureCreation(unittest.TestCase):
                 this_signature = cmd.get_signature('a.py')
                 self.assertEqual(err.getvalue(),'Error creating signature for '
                                                 '\'./a.py\': [Errno 12] Out of Memory\n')
-                m.assert_has_calls([call('./a.py', 'r')])
+                m.assert_has_calls([call('./a.py', 'rb')])
                 m.return_value.read.assert_called_once_with()
                 call_names = set(x[0] for x in m.return_value.mock_calls)
                 self.assertTrue( 'close' in call_names or
@@ -409,11 +408,12 @@ class TestWalk(unittest.TestCase):
             patcher.fs.CreateFile('t1.py')
             patcher.fs.CreateFile('t2.py')
             patcher.fs.CreateFile('test/test.py')
+            patcher.fs.CreateFile('test/flump/test.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['test.py']})
+        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['test.py'], 'test/flump':['test.py']})
         self.assertEqual(len(cat.skipped_files), 0)
 
     def test_020_051_single_exclude_filter_match_file(self):
@@ -428,30 +428,32 @@ class TestWalk(unittest.TestCase):
             patcher.fs.CreateFile('t1.py')
             patcher.fs.CreateFile('t2.py')
             patcher.fs.CreateFile('test/tike.py')
+            patcher.fs.CreateFile('test/flump/test.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py']})
+        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'], 'test/flump':['test.py']})
         self.assertEqual(len(cat.skipped_files), 1)
 
     def test_020_052_single_exclude_filter_match_directory(self):
-        """Single filter argument, which will match one file"""
+        """Single filter argument, which will match one subdirectory"""
         dir = {}
 
         with Patcher() as patcher:
             os.chdir('/tmp')
 
-            cat = processor.Cataloger(exclude_filter=['test/*'])
+            cat = processor.Cataloger(exclude_filter=['test/flump/*'])
 
             patcher.fs.CreateFile('t1.py')
             patcher.fs.CreateFile('t2.py')
             patcher.fs.CreateFile('test/t1.py')
+            patcher.fs.CreateFile('test/flump/test.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py']})
+        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['t1.py']})
         self.assertEqual(len(cat.skipped_files), 1)
 
     def test_020_054_multiple_exclude_filters_no_matches(self):

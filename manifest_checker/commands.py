@@ -90,7 +90,6 @@ def check_catalog(**kwargs):
 
     return env
 
-
 @click.command('create', help='Create a new manifest')
 @click.pass_context
 def create(ctx, **kwargs):
@@ -103,9 +102,10 @@ def create(ctx, **kwargs):
                            {'report_skipped': env._report_skipped,
                             'skipped_files':env.skipped_files},
                            {'report_extension': env._report_extension,
-                            'extensions':env.extension_counts} )
+                            'extensions':[ (e,c) for e,c in env.extension_counts.items()] })
 
     kwargs.get('output', sys.stdout).write(report)
+
 
 def create_catalog(**kwargs):
 

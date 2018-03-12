@@ -821,8 +821,8 @@ class Cataloger(object):
 
         m = hashlib.new(self._hash)
         try:
-            with open(abs_path, 'r') as f:
-                m.update(bytearray(f.read(),'utf-8'))
+            with open(abs_path, 'rb') as f:
+                m.update(f.read())
         except BaseException as e:
             sys.stderr.write(
                 "Error creating signature for '{}': {}\n".format(abs_path, e))

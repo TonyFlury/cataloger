@@ -3,4 +3,4 @@ tox
 pyfakefs
 mock
 six
-templatelite
+templatelite==0.2.0a6

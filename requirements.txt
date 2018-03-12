@@ -1,5 +1,5 @@
 click
-templatelite
+templatelite==0.2.0a6
 six
 sphinx
 sphinx-rtd-theme
