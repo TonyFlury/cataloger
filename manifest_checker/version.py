@@ -13,7 +13,7 @@ Testable Statements :
     ....
 """
 
-__version__ = "0.1.0rc5"
+__version__ = "0.1.0rc6"
 __author__ = 'Tony Flury : anthony.flury@btinternet.com'
 __created__ = '01 Mar 2018'
 

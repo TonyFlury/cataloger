@@ -45,7 +45,7 @@ def check(ctx, **kwargs ):
                            {'report_skipped': env._report_skipped,
                             'skipped_files':env.skipped_files},
                            {'report_extension': env._report_extension,
-                            'extensions':env.extension_counts},
+                            'extensions':[ (e,c) for e,c in env.extension_counts.items()]},
                            {'report_mismatch' : env._report_mismatch,
                             'mismatched': env.mismatched_files},
                             {'report_missing' : env._report_missing,
