@@ -27,5 +27,5 @@ Links :
 - `Source Code`_
 
 
-.. _Full Documentation: http://manifest-checker.readthedocs.org/en/latest/
-.. _Source Code: https://
+.. _Full Documentation: http://cataloger.readthedocs.org/en/latest/
+.. _Source Code: https://github.com/TonyFlury/cataloger
