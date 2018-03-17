@@ -1,6 +1,6 @@
 click
 tox
-pyfakefs
+pyfakefs==3.3
 mock
 six
 templatelite==0.2.0a6
