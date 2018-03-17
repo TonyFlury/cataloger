@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 #
-# manifest-checker documentation build configuration file, created by
+# cataloger documentation build configuration file, created by
 # sphinx-quickstart on Sun Mar 20 11:19:10 2016.
 #
 # This file is execfile()d with the current directory set to its
@@ -46,7 +46,7 @@ source_suffix = '.rst'
 master_doc = 'index'
 
 # General information about the project.
-project = u'manifest-checker'
+project = u'cataloger'
 copyright = u'2016, Tony Flury'
 author = u'Tony Flury'
 
@@ -222,7 +222,7 @@ latex_elements = {
 # (source start file, target name, title,
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
-  (master_doc, 'manifest-checker.tex', u'manifest-checker Documentation',
+  (master_doc, 'cataloger.tex', u'cataloger Documentation',
    u'Tony Flury', 'manual'),
 ]
 
@@ -252,7 +252,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, 'manifest-checker', u'manifest-checker Documentation',
+    (master_doc, 'cataloger', u'cataloger Documentation',
      [author], 1)
 ]
 
@@ -266,8 +266,8 @@ man_pages = [
 # (source start file, target name, title, author,
 #  dir menu entry, description, category)
 texinfo_documents = [
-  (master_doc, 'manifest-checker', u'manifest-checker Documentation',
-   author, 'manifest-checker', 'One line description of project.',
+  (master_doc, 'cataloger', u'cataloger Documentation',
+   author, 'cataloger', 'One line description of project.',
    'Miscellaneous'),
 ]
 

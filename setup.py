@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 """
-# manifest-checker : Implementation of manifest-checker
+# cataloger : Implementation of cataloger
 
 Summary : 
     Simple to use tools to create and check directory contents - ideal for integrity checking
@@ -20,15 +20,13 @@ from setuptools import setup, find_packages
 from codecs import open
 from os import path
 
-from manifest_checker.version import __version__ as version
+from cataloger.version import __version__, __author__, __created__
 
 if sys.version_info.major == 2:
     test_extra = ['mock']
 else:
     test_extra = []
 
-__author__ = 'Tony Flury : anthony.flury@btinternet.com'
-__created__ = '20 Mar 2016'
 
 here = path.abspath(path.dirname(__file__))
 
@@ -36,23 +34,25 @@ here = path.abspath(path.dirname(__file__))
 with open(path.join(here, 'README.rst'), encoding='utf-8') as f:
     long_description = f.read()
 
+author, author_email = [p.strip() for p in __author__.split(':')]
+
 setup(
-        name='manifest-checker',
+        name='cataloger',
 
         # Versions should comply with PEP440.  For a discussion on single-sourcing
         # the version across setup.py and the project code, see
         # https://packaging.python.org/en/latest/single_source_version.html
-        version= version,
+        version= __version__,
 
         description='Simple to use tools to create and check directory contents - ideal for integrity checking',
         long_description=long_description,
 
         # The project's main homepage.
-        url='http://manifest-checker.readthedocs.org/en/latest/',
+        url='http://cataloger.readthedocs.org/en/latest/',
 
         # Author details
-        author='Tony Flury',
-        author_email='anthony.flury@btinternet.com',
+        author = author,
+        author_email = author_email,
 
         # Choose your license
         license='MIT',
@@ -109,7 +109,7 @@ setup(
         # installed, specify them here.  If using Python 2.6 or less, then these
         # have to be included in MANIFEST.in as well.
         # Using include_package_data instead - and setuptools-git
-        package_data={ 'manifest_checker': ['templates/*.tmpl']
+        package_data={ 'cataloger': ['templates/*.tmpl']
         },
 
         # Although 'package_data' is the preferred approach, in some case you may
@@ -125,6 +125,6 @@ setup(
         # "scripts" keyword. Entry points provide cross-platform support and allow
         # pip to create the appropriate form of executable for the target platform.
         entry_points={
-        'console_scripts' : ['catalog=manifest_checker.main:main']
+        'console_scripts' : ['catalog=cataloger.main:main']
         },
 )

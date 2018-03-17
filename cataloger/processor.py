@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 """
-# manifest-checker : Implementation of environment.py
+# cataloger : Implementation of environment.py
 
 Summary : 
     <summary of module/class being implemented>
@@ -13,6 +13,7 @@ Testable Statements :
     ....
 """
 
+
 import sys
 import os
 import hashlib
@@ -21,9 +22,10 @@ import string
 import fnmatch
 import errno
 import click
+from collections import OrderedDict
 
 import re
-from manifest_checker import defaults
+from cataloger import defaults
 
 __version__ = "0.1"
 _author__ = 'Tony Flury : anthony.flury@btinternet.com'
@@ -41,7 +43,7 @@ class ConfigError(Exception):
 
 
 class Cataloger(object):
-    """General class for processing the manifest file
+    """General class for processing the catalog file
 
         Implements the low level API as documented and
             read the config file as documented
@@ -63,8 +65,8 @@ class Cataloger(object):
     # Attribute dict : k - attribute name, v = attribute info tuple
     # Attribute Info Tuple : [0] = instance attribute name, [1] = default value
     config_sections_and_attrs = \
-        {'manifest':
-             {'manifest': ('_manifest_name', defaults.DEFAULT_MANIFEST_FILE),
+        {'catalog':
+             {'catalog': ('_catalog_name', defaults.DEFAULT_CATALOG_FILE),
               'root': ('_root', '.'),
               'hash': ('_hash', defaults.DEFAULT_HASH)},
          'extensions':
@@ -81,8 +83,8 @@ class Cataloger(object):
                            'report_mismatch' in defaults.DEFAULT_REPORTON),
               'missing': ('_report_missing',
                           'report_missing' in defaults.DEFAULT_REPORTON),
-              'skipped': ('_report_skipped',
-                          'report_skipped' in defaults.DEFAULT_REPORTON),
+              'excluded': ('_report_excluded',
+                          'report_excluded' in defaults.DEFAULT_REPORTON),
               'extra': (
                   '_report_extra',
                   'report_extra' in defaults.DEFAULT_REPORTON),
@@ -91,7 +93,7 @@ class Cataloger(object):
               }
          }
 
-    def __init__(self, action='', **kwargs):
+    def __init__(self, action='', verbose=0, **kwargs):
         """
             Capture and process the arguments - either from the command line -
             :param no_config: Boolean - if true the config file is ignored
@@ -99,13 +101,13 @@ class Cataloger(object):
 
             :param config: The name of the config file to use
                     Defaults to ''. Unless a specific config file is provided
-                    the processor will attempt to read 'manifest.cfg' as
+                    the processor will attempt to read defaults.DEFAULT_CONFIG_FILE as
                     the config file.
 
             :param action: One of create or check - no default
 
-            :param manifest:The name of the manifest file to use
-                    Defaults to manifest.txt
+            :param catalog: The name of the catalog file to use
+                    Defaults to catalog.cat
             :param hash: The name of the hash algorithm to use
                     Defaults to sha224
             :param root: The root directory to start the cataloguing
@@ -143,22 +145,22 @@ class Cataloger(object):
                     excluded from the catalogue.
 
             :param report_mismatch: Boolean - Whether to include reports on
-                    mismatched files (i.e. files which exist in the manifest,
+                    mismatched files (i.e. files which exist in the catalog,
                     and the local directory tree but have different hash
                     values). Only relevant on a check action. Default - True
 
             :param report_missing: Boolean - Whether to report on missing
-                    files (i.e. files which exist in the manifest but are
+                    files (i.e. files which exist in the catalog but are
                     missing from the local directory tree). Only relevant on a
                     check action. Default - True
 
             :param report_extra: Boolean - Whether to report on extra files
-                    (i.e. files which don't exist in the manifest but which
+                    (i.e. files which don't exist in the catalog but which
                     exist in the local directory tree). Only relevant on a
                     check action. Default - True
 
             :param report_skipped: Boolean - Whether to the report the counts
-                    of skipped files. The count doesn't include files in top
+                    of excluded files. The count doesn't include files in top
                     level ignored directories. Default - True
 
             :param report_extensions: Boolean - whether to report on counts of
@@ -166,13 +168,6 @@ class Cataloger(object):
 
             :param verbose: The level of detail to report during cataloguing
                     Default - 1
-
-            General Notes
-            -------------
-            All of these parameters with the exception of 'extensions' and
-            'ignore_directory' are created through the command line (The
-            command line creates the 'rm_extensions'/'add_extensions' and
-            'rm_directory' 'add_directory' arguments instead)
 
             Config file processing :
             ------------------------
@@ -204,8 +199,8 @@ class Cataloger(object):
         #      for opt, n_d in
         #      self.config_sections_and_attrs[section].items()])
 
-        self._config = kwargs.get('conifg', 'manifest.cfg')
-        self._config = 'manifest.cfg' if not self._config else self._config
+        self._config = kwargs.get('conifg', defaults.DEFAULT_CONFIG_FILE)
+        self._config = defaults.DEFAULT_CONFIG_FILE if not self._config else self._config
 
         self._noconfig = kwargs.get('no_config', False)
 
@@ -213,8 +208,8 @@ class Cataloger(object):
             self._process_config(
                 explicit_config_file=kwargs.get('config', '') != '')
 
-        # The manifest section - override defaults with kwargs if they exist
-        self._manifest_name = kwargs.get('manifest', self._manifest_name)
+        # The catalog section - override defaults with kwargs if they exist
+        self._catalog_name = kwargs.get('catalog', self._catalog_name)
         self._hash = kwargs.get('hash', self._hash)
         self._root = kwargs.get('root', self._root)
 
@@ -226,8 +221,8 @@ class Cataloger(object):
         self._report_missing = kwargs.get('report_missing',
                                           self._report_missing)
         self._report_extra = kwargs.get('report_extra', self._report_extra)
-        self._report_skipped = kwargs.get('report_skipped',
-                                          self._report_skipped)
+        self._report_excluded = kwargs.get('report_excluded',
+                                           self._report_excluded)
         self._report_extension = kwargs.get('report_extensions',
                                             self._report_extension)
 
@@ -244,31 +239,32 @@ class Cataloger(object):
         self._ignore_directories -= set(kwargs.get('rm_directory', {}))
         self._ignore_directories |= set(kwargs.get('add_directory', {}))
 
-        self._include_filter = kwargs.get('include_filter',
-                                          self._include_filter)
-        self._exclude_filter = kwargs.get('exclude_filter',
-                                          self._exclude_filter)
+        # Only use include_filter argument if it isn't blank
+        if 'include_filter' in kwargs and kwargs['include_filter']:
+            self._include_filter = kwargs['include_filter']
+
+        # Only use exclude_filter argument if it isn't blank
+        if 'exclude_filter' in kwargs and kwargs['exclude_filter']:
+            self._exclude_filter = kwargs['exclude_filter']
 
         # ToDO Remove Report Grouping probably
         # Turns on grouped reporting - Do we need this.
         self._group = kwargs.get('group', defaults.DEFAULT_REPORT_GROUP)
 
-        # Internal attributes for counting skipped files, etc.
-        self._skipped_file_count = 0  # Skipped files are only a count
-        self._manifest_data_count = 0  # Files output to manifest
+        # Internal attributes for counting excluded files, etc.
+        self._excluded_file_count = 0  # Skipped files are only a count
+        self._catalog_data_count = 0  # Files output to catalog
         self._extra_files = []  # List of files that are record_extra
         self._mismatched_files = []  # List of mismatched files
         self._extension_counts = {}  # Count of each file extension
-        self._skipped_files = []
+        self._excluded_files = []
 
-        # manifest_data is a 2 level dictioanry:
+        # catalog_data is a 2 level dictioanry:
         # top level of directories, key = directory, value is dictionary
         # 2nd level key = file name, value is 2-tuple (signature/status)
-        self._manifest_data = {}
+        self._catalog_data = OrderedDict()
 
-        self._filter = kwargs.get('filter', [])
-
-        self._manifest_fp = None
+        self._catalog_fp = None
         self._action = None
 
         self._error_code = 0
@@ -281,18 +277,31 @@ class Cataloger(object):
         self._start_command()
 
     @property
-    def manifest_file_name(self):
-        """The file name of the manifest file - provided for completeness"""
-        return self._manifest_name
+    def verbose(self):
+        return int(self._verbose)
+
+    def report_category(self, category):
+        cat_to_attr = {'excluded':'_report_excluded','missing':'_report_missing',
+                       'mismatch':'_report_mismatch','extra':'_report_extra',
+                       'extension':'_report_extension'}
+        try:
+            return getattr(self, cat_to_attr[category])
+        except Exception:
+            return False
+
+    @property
+    def catalog_file_name(self):
+        """The file name of the catalog file - provided for completeness"""
+        return self._catalog_name
 
     @property
     def processed_count(self):
-        return self._manifest_data_count
+        return self._catalog_data_count
 
     @property
-    def skipped_files(self):
-        """The list of those files skipped due to exclude filters"""
-        return self._files_by_status('skipped')
+    def excluded_files(self):
+        """The list of those files excluded due to exclude filters"""
+        return self._files_by_status('excluded')
 
     @property
     def mismatched_files(self):
@@ -304,26 +313,38 @@ class Cataloger(object):
     @property
     def extra_files(self):
         """The list of extra files
-            those that exist locally but not in the manifest"""
+            those that exist locally but not in the catalog"""
         return self._files_by_status('extra')
 
     @property
     def missing_files(self):
         """The list of missing files
-            those that exist in the manifest but not locally"""
+            those that exist in the catalog but not locally"""
         return self._files_by_status('missing')
 
+
+    @property
+    def catalog_summary_by_directory(self):
+        for directory, files in self._catalog_data.items():
+            yield {'path':directory,
+                   'added':sum(1 for file, data in files.items() if data['processed'] == 'added'),
+                   'processed': sum(1 for file, data in files.items() if
+                                data['processed'] == 'processed'),
+                   'excluded':sum(1 for file, data in files.items() if data['processed'] == 'excluded'),
+                   'missing': sum(1 for file, data in files.items() if data['processed'] == 'missing'),
+                   'mismatch': sum(1 for file, data in files.items() if data['processed'] == 'mismatch'),
+                   'extra': sum(1 for file, data in files.items() if data['processed'] == 'extra'),}
 
     def _files_by_status(self, status):
         return [file_name if directory == '.'
                             else os.path.join(directory, file_name)
-                for directory, files in self._manifest_data.items()
+                for directory, files in self._catalog_data.items()
                     for file_name in files
                         if files[file_name]['processed'] == status]
 
     @property
     def extension_counts(self):
-        """A generator of tuples of the file extensions and their counts"""
+        """A dictionary the file extensions and their counts"""
         return self._extension_counts
 
     def _read_config(self, explicit_config_file=False):
@@ -442,12 +463,23 @@ class Cataloger(object):
         attrs_options = self.config_sections_and_attrs['reports']
         try:
             option, _, value = (x.strip() for x in line.partition('='))
-            if option != 'verbose':
-                value = value.lower() in ['true', 'yes']
-            else:
-                try:
+            # Try to identify what this option is - based on the attribute to set
+            attr_name = attrs_options[option][0]
+            if not hasattr(self, attr_name):
+                raise KeyError
+            try:
+                if option != 'verbose':
+                    if value.lower() in ['true', 'yes']:
+                        value = True
+                    elif value.lower() in ['false', 'no']:
+                        value = False
+                    else:
+                        raise ValueError
+                else:
                     value = int(value)
-                except ValueError:
+                    if value not in [0,1,2]:
+                        raise ValueError
+            except ValueError:
                     six.raise_from(ConfigError(
                         'Invalid value in section [reports] :'
                         ' \'{}\' on line {}'.format(
@@ -560,7 +592,7 @@ class Cataloger(object):
                     section=section, line=line, line_no=line_no)), None)
 
     def _config_line_filters_section(self, line, line_no):
-        """Called for any line in the manifest section
+        """Called for any line in the catalog section
 
             Each line can only be : <option>=<value>
 
@@ -579,15 +611,15 @@ class Cataloger(object):
                 ' \'{}\' on line {}'.format(
                     line, line_no)), None)
 
-    def _config_line_manifest_section(self, line, line_no):
-        """Called for any line in the manifest section
+    def _config_line_catalog_section(self, line, line_no):
+        """Called for any line in the catalog section
 
             Each line can only be : <option>=<value>
 
             :param line: The full line from the config file
             :param line_no : The line number in the config file
         """
-        attrs_options = self.config_sections_and_attrs['manifest']
+        attrs_options = self.config_sections_and_attrs['catalog']
         try:
             option, _, value = (x.strip() for x in line.partition('='))
             setattr(self, attrs_options[option][0], value)
@@ -600,7 +632,7 @@ class Cataloger(object):
                 return
         except KeyError:
             six.raise_from(ConfigError(
-                'Invalid config line in section [manifest] :'
+                'Invalid config line in section [catalog] :'
                 ' \'{}\' on line {}'.format(
                     line, line_no)), None)
 
@@ -613,35 +645,35 @@ class Cataloger(object):
                 ' \'{}\' on line {}'.format(line, line_no)),None)
 
     def _start_command(self):
-        """Internal method to trigger the appropriate opening of the manifest file
+        """Internal method to trigger the appropriate opening of the catalog file
 
-        On a check action; the manifest is open to read -  and then loaded
+        On a check action; the catalog is open to read -  and then loaded
         into memory for speed
 
-        On a create action; the manifest is open to write
+        On a create action; the catalog is open to write
         """
         if self._action == 'check':
             try:
-                with open(self._manifest_name, 'r') as self._manifest_fp:
-                    self._load_manifest()
+                with open(self._catalog_name, 'r') as self._catalog_fp:
+                    self._load_catalog()
             except IOError as e:
                 six.raise_from(CatalogError(
-                    'Error opening manifest file : {} - {}'.format(
-                        self._manifest_name, str(e))), None)
+                    'Error opening catalog file : {} - {}'.format(
+                        self._catalog_name, str(e))), None)
             except CatalogError as e:
                 raise
             finally:
-                self._manifest_fp = None
+                self._catalog_fp = None
         elif self._action != 'create':
             six.raise_from(ValueError(
                 'Invalid value for subcommand: {}'.format(self._action)), None)
 
-    def _load_manifest(self):
-        """Load the given manifest file, and analyse into a dictionary
+    def _load_catalog(self):
+        """Load the given catalog file, and analyse into a dictionary
             Top Level dict:  key is directory, value is 2nd level dictionary
                 2nd level dictionary : key is file_name, value is signature
         """
-        for line_num, entry in enumerate(self._manifest_fp):
+        for line_num, entry in enumerate(self._catalog_fp):
             entry = entry.strip()
 
             if not entry:
@@ -649,29 +681,29 @@ class Cataloger(object):
 
             if '\t' not in entry:
                 six.raise_from(CatalogError(
-                    'Invalid manifest format - missing tab on line {}'.format(
+                    'Invalid catalog format - missing tab on line {}'.format(
                         line_num)), None)
 
             entry_name, signature = entry.strip().split('\t')
 
             directory, file_name = os.path.split(entry_name.strip())
             directory = directory if directory else '.'
-            dirlist = self._manifest_data.setdefault(directory, {})
+            dirlist = self._catalog_data.setdefault(directory, {})
 
             if any(True for x in signature if x not in string.hexdigits):
                 six.raise_from(CatalogError(
-                    'Invalid manifest format -'
+                    'Invalid catalog format -'
                     ' invalid signature on line {}'.format(
                         line_num)), None)
             else:
-                dirlist[file_name] = {'signature': signature.strip(),
-                                      'processed': False}
+                dirlist[file_name] = OrderedDict([('signature', signature.strip()),
+                                      ('processed', False)])
 
-            self._manifest_data_count += 1
+            self._catalog_data_count += 1
         else:
-            if self._manifest_data_count == 0:
+            if self._catalog_data_count == 0:
                 six.raise_from(CatalogError(
-                    'Empty manifest file : {}'.format(self._manifest_name)),
+                    'Empty catalog file : {}'.format(self._catalog_name)),
                     None)
             else:
                 return
@@ -680,7 +712,7 @@ class Cataloger(object):
         """Return True if this file should be recorded/processed"""
 
         # Don't process the Manifest file itself
-        if directory == self._root and file_name == self._manifest_name:
+        if directory == self._root and file_name == self._catalog_name:
             return False
 
         full = os.path.join(directory, file_name)
@@ -711,38 +743,36 @@ class Cataloger(object):
         ext = os.path.splitext(path)[1]
         self._extension_counts[ext] = self._extension_counts.setdefault(ext,0) + 1
 
-    def manifest_add(self, rel_path, signature):
-        """Add data to the manifest"""
+    def add_to_catalog(self, rel_path, signature):
+        """Add data to the catalog"""
         directory, file_name = os.path.split(rel_path)
-        d_data = self._manifest_data.setdefault(directory,{})
+        d_data = self._catalog_data.setdefault(directory, {})
         d_data[file_name] = {'signature':signature,
                                         'processed':'added'}
 
-        self._manifest_data_count += 1
+        self._catalog_data_count += 1
         self._record_extension(rel_path)
 
-    def manifest_write(self):
-        """Write the file data into the manifest"""
+    def write_catalog(self):
+        """Write the file data into the catalog"""
 
         try:
-            with open(self._manifest_name, 'w') as manifest_fp:
-                for directory, files in self._manifest_data.items():
-                    for file_name, data in self._manifest_data[directory].items():
+            with open(self._catalog_name, 'w') as catalog_fp:
+                for directory, files in self._catalog_data.items():
+                    for file_name, data in self._catalog_data[directory].items():
                         if data.get('processed',False) not in ['added']:
                             continue
-                        manifest_fp.write(
+                        catalog_fp.write(
                 '{path}\t{signature}\n'.format(
                         path=os.path.join(directory, file_name),
-                        signature=self._manifest_data[directory][file_name]['signature']))
+                        signature=self._catalog_data[directory][file_name]['signature']))
         except IOError as e:
                 six.raise_from(CatalogError(
-                    'Error opening/writing manifest file : \'{}\' - {}'.format(
-                        self._manifest_name, str(e))), None)
+                    'Error opening/writing catalog file : \'{}\' - {}'.format(
+                        self._catalog_name, str(e))), None)
 
     def abs_path(self, rel_path):
-        """Return an absolute path from a relative path
-
-            based from the given root"""
+        """Return an absolute path from a relative path based from the given root"""
         return os.path.join(self._root, rel_path)
 
     def walk(self):
@@ -755,7 +785,7 @@ class Cataloger(object):
         for directory, sub_directories, files in os.walk(self._root):
 
             # Don't recurse into directories that should be ignored
-            if directory == self._root:
+            if self.abs_path(directory) == self.abs_path(self._root):
                 sub_directories[:] = [sub for sub in sub_directories if
                                       sub not in self._ignore_directories]
 
@@ -765,57 +795,59 @@ class Cataloger(object):
             if process_files:
                 yield os.path.relpath(directory, self._root), process_files
 
-            # After yielding Look at every file and record those skip
+            # After yielding Look at every file and record those as excluded
+            # Assumes that the consumer code records each file in some way
             for file_name in files:
                 if file_name not in process_files:
-                    self.record_skipped(directory, file_name)
+                    self.record_excluded(directory, file_name)
 
-    def is_file_in_manifest(self, directory, file_name):
-        """Return True if this directory and file is in the loaded manifest"""
-        return directory in self._manifest_data and \
-               file_name in self._manifest_data.get(directory, {})
+    def is_file_in_catalog(self, file_path):
+        """Return True if this directory and file is in the loaded catalog"""
+        directory, file_name = os.path.split(file_path)
+        return directory in self._catalog_data and \
+               file_name in self._catalog_data.get(directory, {})
 
-    def is_directory_in_manifest(self, directory):
-        """Return True if this directory is in the loaded manifest"""
-        return directory in self._manifest_data
+    def is_directory_in_catalog(self, directory):
+        """Return True if this directory is in the loaded catalog"""
+        return directory in self._catalog_data
 
     def get_non_processed(self, directory):
         """Whether this file has been processed by the checking procedure
 
-           Only return False if the file data is in the manifest
+           Only return False if the file data is in the catalog
            but hasn't been processed
 
-           if the directory is missing from the manifest - then
+           if the directory is missing from the catalog - then
            this directory is deliberately omitted
 
-           if the file is in manifest then look at the 'processed' key ...
+           if the file is in catalog then look at the 'processed' key ...
         """
-        for file_name in self._manifest_data.get(directory, []):
-            if not self._manifest_data[directory][file_name].get(
+        for file_name in self._catalog_data.get(directory, []):
+            if not self._catalog_data[directory][file_name].get(
                     'processed', False):
                 yield file_name
 
-    def get_signature(self, rel_path=None, manifest=False):
+    def get_signature(self, rel_path=None, from_catalog=False):
         """Generate or fetch the signature for the given path
 
            :param rel_path: The relative path from this current directory
                     to the file
-           :param manifest: Boolean - whether to fetch the data from
-                    the manifest file.
+           :param from_catalog: Boolean - whether to fetch the data from
+                    the catalog file.
 
-            if manifest is True this fetches the signature for this file from
-            the manifest file.
+            if from_catalog is True this fetches the signature for this file from
+            the catalog file.
 
-            if manifest is False this will generate the signature based
+            if from_catalog is False this will generate the signature based
             on the file content
         """
-        if manifest:
+        if from_catalog:
             directory, name = os.path.split(rel_path)
-            if directory not in self._manifest_data or name not in \
-                    self._manifest_data[directory]:
+            if directory not in self._catalog_data or name not in \
+                    self._catalog_data[directory]:
                 return None
 
-            return self._manifest_data[directory][name]['signature'].strip()
+            return self._catalog_data[directory][name]['signature'].strip()
 
         abs_path = self.abs_path(rel_path)
 
@@ -832,36 +864,35 @@ class Cataloger(object):
     def _path_rel_to_root(self, abspath):
         return os.path.relpath(abspath, self._root)
 
-    def mark_processed(self, rel_path, status='processed'):
+    def _mark_processed(self, rel_path, status='processed'):
         """Mark a file as having been processed"""
+        if status not in ['excluded']:
+            self._record_extension(rel_path)
         directory, file_name = os.path.split(rel_path)
-        self._manifest_data.setdefault(directory, {})
-        self._manifest_data[directory].setdefault(file_name, {})
-        self._manifest_data[directory][file_name]['processed'] = status
+        self._catalog_data.setdefault(directory, {})
+        self._catalog_data[directory].setdefault(file_name, {})
+        self._catalog_data[directory][file_name]['processed'] = status
 
-    def record_skipped(self, directory, file_name):
-        """Count the and Record the skipped files"""
+    def record_ok(self, rel_path):
+        self._mark_processed(rel_path=rel_path, status='processed')
 
-        # Don't record the manifest file itself as being skipped
+    def record_excluded(self, directory, file_name):
+        """Count the and Record the excluded files"""
+
+        # Don't record the catalog file itself as being excluded
         if (self.abs_path(directory) == self.abs_path(self._root) and
-                file_name == self._manifest_name):
+                file_name == self._catalog_name):
             return
 
-        self._skipped_file_count += 1
+        self._excluded_file_count += 1
 
-        self.mark_processed(os.path.join(directory,file_name), 'skipped')
-#        self._skipped_files.append(os.path.join(directory, file_name))
+        self._mark_processed(os.path.join(directory, file_name), 'excluded')
 
     def record_missing(self, rel_path):
-        self._record_extension(rel_path)
-        self.mark_processed(rel_path, 'missing')
+        self._mark_processed(rel_path, 'missing')
 
     def record_extra(self, rel_path):
-        self._record_extension(rel_path)
-        self.extra_files.append(self._path_rel_to_root(rel_path))
-        self.mark_processed(rel_path, 'extra')
+        self._mark_processed(rel_path, 'extra')
 
     def record_mismatch(self, rel_path):
-        self._record_extension(rel_path)
-        self.mismatched_files.append(self._path_rel_to_root(rel_path))
-        self.mark_processed(rel_path, 'mismatch')
+        self._mark_processed(rel_path, 'mismatch')

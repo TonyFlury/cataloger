@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding=utf-8
 """
-# manifest-checker : Implementation of new_mock_open
+# cataloger : Implementation of new_mock_open
 
 Summary : 
     <summary of module/class being implemented>

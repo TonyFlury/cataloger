@@ -5,8 +5,10 @@ By default the manifest suite with the default options as above will create a ma
 
 If you don't use Django, you can still use the manifest suite to check your copies/deployments. Various options command line and Configuration File options exist to make the manifest suite usable including :
 
-- check for different files types
-- ignoring different directories
+    - check for different files types
+    - ignoring different directories
+    - filtering to include and exclude file based on wildcard matches
+
 
 File Extension
         .py, .html, .txt, .css, .js, .gif, .png, .jpg, .jpeg
@@ -15,7 +17,7 @@ Top Level directories which are ignored :
     static, env, htmlcov, media,build, dist, docs
 
 Default manifest file
-    'manifest.txt'
+    'catalog.cat'
 
 Default hash/checksum algorithm.
         'sha224' if 'sha224' in hashlib.algorithms else hashlib.algorithms[0]

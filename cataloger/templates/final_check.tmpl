@@ -1,0 +1,37 @@
+{{ processed_count }} files processed {% if report_excluded %} - {{ excluded_files|len }} files excluded {% endif %}
+
+{% if verbose >= 2 %}
++==========================================+===========+===========+============+=========+==========+
+|  Name                                    | Processed |  Missing  | Mismatched |  Extra  | Excluded |
+{% for directory in by_directory %}
+    {% if (verbose == 3) or (verbose == 2 and directory.processed > 0)  %}
++------------------------------------------+-----------+-----------+------------+---------+----------+
+| {{ directory.path|format <40s}} | {{directory.processed|format ^9d}} | {{directory.missing|format ^9d}} | {{directory.mismatch|format ^10d}} | {{directory.extra|format ^7d}} | {{directory.excluded|format ^8d}} |
+    {% endif %}
+{% endfor %}
++==========================================+===========+===========+============+=========+==========+
+{% endif %}
+{% if report_extension %}
+Files processed by file types:
+    {% for extension, count in extensions %}
+    {{ extension }} : {{ count }}
+    {% endfor %}
+{% endif %}
+{% if report_mismatch %}
+{{ mismatched|len }} files with mismatched signatures
+    {% for file in mismatched %}
+    {{ file }}
+    {% endfor %}
+{% endif %}
+{% if report_missing %}
+{{ missing|len }} missing files
+    {% for file in missing %}
+    {{ file }}
+    {% endfor %}
+{% endif %}
+{% if report_extra %}
+{{ extra|len }} extra files
+    {% for file in extra %}
+    {{ file }}
+    {% endfor %}
+{% endif %}

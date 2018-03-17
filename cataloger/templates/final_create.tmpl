@@ -1,0 +1,19 @@
+{{ processed_count }} files processed {% if report_excluded %} - {{ excluded_files|len }} files excluded {% endif %}
+
+{% if verbose >= 2 %}
++==========================================+=========+==========+
+|  Name                                    |  Added  | Excluded |
+{% for directory in by_directory %}
+    {% if (verbose == 3) or (verbose == 2 and directory.added > 0)  %}
++------------------------------------------+---------+----------+
+| {{ directory.path|format <40s }} | {{directory.added|format ^7d}} | {{directory.excluded|format ^8d}} |
+    {% endif %}
+{% endfor %}
++==========================================+=========+==========+
+{% endif %}
+{% if report_extension %}
+Files processed by file types:
+    {% for extension, count in extensions%}
+    {{ extension }} : {{ count }}
+    {% endfor %}
+{% endif %}
