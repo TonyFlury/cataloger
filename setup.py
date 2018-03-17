@@ -48,14 +48,14 @@ setup(
         long_description=long_description,
 
         # The project's main homepage.
-        url='http://cataloger.readthedocs.org/en/latest/',
+        url='https://upload.pypi.org/legacy/',
 
         # Author details
         author = author,
         author_email = author_email,
 
         # Choose your license
-        license='MIT',
+        license='License :: OSI Approved :: MIT',
 
         # See https://pypi.python.org/pypi?%3Aaction=list_classifiers
         classifiers=[
@@ -63,16 +63,15 @@ setup(
             #   3 - Alpha
             #   4 - Beta
             #   5 - Production/Stable
-            'Development Status :: 4 - Beta',
+            'Development Status :: 5 - Production/Stable',
 
             # Indicate who your project is intended for
             'Intended Audience :: Developers',
-            'Framework :: Django',
-            'Natural Language :: English',
-            'Topic :: Software Development :: Quality Assurance',
+#            'Framework :: Django',
+#            'Topic :: Software Development :: Quality Assurance',
 
             # Pick your license as you wish (should match "license" above)
-            'License :: OSI Approved :: MIT',
+#            'License :: OSI Approved :: MIT',
 
             # Specify the Python versions you support here. In particular, ensure
             # that you indicate whether you support Python 2, Python 3 or both.
