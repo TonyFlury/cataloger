@@ -11,11 +11,11 @@ import sys
 import os
 import click
 import hashlib
-import defaults
+from . import defaults
 import pkg_resources
 
 from cataloger import version
-import commands
+from . import commands
 
 
 def validate_report_out(ctx, param, value):
