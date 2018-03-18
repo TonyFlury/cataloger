@@ -25,7 +25,7 @@ import os
 import errno
 
 # noinspection PyPackageRequirements
-# Only needed for testing see test_requirements.txt & test27_requirements.txt
+# Only needed for testing see test35_requirements.txt & test27_requirements.txt
 from pyfakefs.fake_filesystem_unittest import Patcher
 
 import cataloger.processor as processor
