@@ -17,6 +17,8 @@ import unittest
 import sys
 import re
 import inspect
+from io import StringIO
+
 import click
 import click.testing
 import six
@@ -33,24 +35,23 @@ import cataloger.defaults as defaults
 import cataloger.commands as commands
 import cataloger.main as cli_main
 
-import pkg_resources
-
-from tests.new_mock_open import new_mock_open
+from importlib.resources import files
 
 import six
 
-if six.PY2:
-    # noinspection PyPackageRequirements
-    # mock is a separate package for Python2.7 - see test27_requirements.txt
-    from mock import patch, mock_open, MagicMock, call
-else:
-    from unittest.mock import patch, mock_open, MagicMock, call
+from unittest.mock import patch, mock_open, MagicMock, call
 
-# noinspection Annotator
-try:
-    import builtins
-except ImportError:
-    import __builtin__ as builtins
+import builtins
+
+
+def find_template_path():
+    print([i for i in files('cataloger').iterdir()])
+    content = files('cataloger').iterdir()
+    for i in content:
+        if 'templates' in i:
+            return i
+    else:
+        return None
 
 def get_sig(data, hash='sha224'):
     return hashlib.new(hash, bytearray(data, 'utf-8')).hexdigest()
@@ -94,7 +95,7 @@ class TestCatalogerCreation(unittest.TestCase):
         """Test the start command - empty catalog"""
         with patch('cataloger.processor.open', MagicMock(name='open')) as m:
             m.return_value = MagicMock(name='file')
-            with six.assertRaisesRegex(self, processor.CatalogError, r'Empty catalog file : catalog\.cat'):
+            with self.assertRaisesRegex( processor.CatalogError, r'Empty catalog file : catalog\.cat'):
                 cat = processor.Cataloger(action='check')
             m.assert_has_calls([call(defaults.DEFAULT_CATALOG_FILE, 'r'), call(defaults.DEFAULT_CONFIG_FILE, 'r')], any_order=True)
             call_names = set(x[0] for x in m.return_value.mock_calls)
@@ -104,7 +105,7 @@ class TestCatalogerCreation(unittest.TestCase):
         """No Explicit config file parameter, no default config - no warning"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            with patch('sys.stderr', six.StringIO()) as stderr:
+            with patch('sys.stderr', StringIO()) as stderr:
                 cat= processor.Cataloger()
                 self.assertEqual(stderr.getvalue(), '')
 
@@ -112,53 +113,43 @@ class TestCatalogerCreation(unittest.TestCase):
         """Explicit config file parameter, no config file, warning generated"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            with patch('sys.stderr', six.StringIO()) as stderr:
+            with patch('sys.stderr', StringIO()) as stderr:
                 cat= processor.Cataloger(config=defaults.DEFAULT_CONFIG_FILE)
-                six.assertRegex(self, stderr.getvalue(), 'Warning : Unable to open config file \'catalog.cfg\'; continuing with defaults')
+                self.assertRegex( stderr.getvalue(), 'Warning : Unable to open config file \'catalog.cfg\'; continuing with defaults')
 
     def test_000_004_config_default_noperm(self):
         """No Explicit config file parameter, config file exists but no perm"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE)
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE)
             os.chmod('/tmp/catalog.cfg', 0o007)
-            with patch('sys.stderr', six.StringIO()) as stderr:
-                with six.assertRaisesRegex(self, processor.ConfigError, r'Permission denied'):
+            with patch('sys.stderr', StringIO()) as stderr:
+                with self.assertRaisesRegex( processor.ConfigError, r'Permission denied'):
                     cat= processor.Cataloger()
 
     def test_000_005_config_explicit_noperm(self):
         """Explicit config file parameter, config file exists but no perm"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE)
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE)
             os.chmod('/tmp/catalog.cfg', 0o007)
-            with patch('sys.stderr', six.StringIO()) as stderr:
-                with six.assertRaisesRegex(self, processor.ConfigError, r'Permission denied'):
+            with patch('sys.stderr', StringIO()) as stderr:
+                with self.assertRaisesRegex( processor.ConfigError, r'Permission denied'):
                     cat= processor.Cataloger(config=defaults.DEFAULT_CONFIG_FILE)
 
     def test_000_006_config_odd_exception(self):
         """Explicit config file parameter, config file exists but no perm"""
         with patch('cataloger.processor.open', MagicMock() ) as m:
             m.side_effect = TypeError('What an odd Error')
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Unable to read config file \'catalog\.cfg\' : What an odd Error'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Unable to read config file \'catalog\.cfg\' : What an odd Error'):
                     cat= processor.Cataloger(config=defaults.DEFAULT_CONFIG_FILE)
-
-    def test_000_010_new_mock_open(self):
-        data = 'this is data\nspread over many lines\nto see if \n iter will work'
-        if six.PY3:
-            open_name = 'builtins.open'
-        else:
-            open_name = '__builtin__.open'
-        with patch(open_name, new_mock_open(read_data=data)) as m:
-            with open('a.b', 'r') as fp:
-                self.assertEqual([i for i in six.StringIO(data)], [x for x in fp])
 
     def test_000_023_check_command_nonempty_catalog(self):
         """Test the start command"""
         catalog = """a.py\t787908798d
 b.py\t787787ef7e
 c.py\t7898798acd"""
-        with patch('cataloger.processor.open', new_mock_open(read_data=catalog)) as m:
+        with patch('cataloger.processor.open', mock_open(read_data=catalog)) as m:
             cat = processor.Cataloger(action='check', no_config=True)
             m.assert_called_once_with(defaults.DEFAULT_CATALOG_FILE, 'r')
             call_names = set(x[0] for x in m.return_value.mock_calls)
@@ -166,12 +157,12 @@ c.py\t7898798acd"""
 
     def test_000_030_start_invalid_command(self):
         """Test the start command"""
-        with six.assertRaisesRegex(self, ValueError,r'foobar'):
+        with self.assertRaisesRegex( ValueError,r'foobar'):
             cat = processor.Cataloger(action='foobar')
 
     def test_000_031_empty_extension_list(self):
         """Instantiate Command catironment with empty extension list"""
-        with six.assertRaisesRegex(self, processor.CatalogError, r'No file extensions given to catalogue or check'):
+        with self.assertRaisesRegex( processor.CatalogError, r'No file extensions given to catalogue or check'):
             cat = processor.Cataloger(extensions=[])
 
 class TestSignatureCreation(unittest.TestCase):
@@ -263,7 +254,7 @@ class TestSignatureCreation(unittest.TestCase):
 
         with patch('cataloger.processor.open',
                    mock_open(read_data=sample_text)) as m:
-            with patch('cataloger.processor.sys.stderr', six.StringIO()) as err:
+            with patch('cataloger.processor.sys.stderr', StringIO()) as err:
                 m.side_effect = IOError(errno.EPERM,'No permission')
                 this_signature = cmd.get_signature('a.py')
                 self.assertEqual(err.getvalue(),'Error creating signature for '
@@ -278,7 +269,7 @@ class TestSignatureCreation(unittest.TestCase):
 
         with patch('cataloger.processor.open',
                    mock_open(read_data=sample_text)) as m:
-            with patch('cataloger.processor.sys.stderr', six.StringIO()) as err:
+            with patch('cataloger.processor.sys.stderr', StringIO()) as err:
                 m.return_value.read.side_effect = IOError(errno.ENOMEM,'Out of Memory')
                 this_signature = cmd.get_signature('a.py')
                 self.assertEqual(err.getvalue(),'Error creating signature for '
@@ -302,14 +293,14 @@ class TestWalk(unittest.TestCase):
 
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
 
             cat = processor.Cataloger()
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py']})
+        self.assertCountEqual(dir,{'.': ['t1.py', 't2.py']})
         self.assertEqual(len(cat.excluded_files), 0)
 
     def test_020_001_WalkFlatDirectoryExclusions(self):
@@ -319,19 +310,19 @@ class TestWalk(unittest.TestCase):
 
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t1.pyc')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE)
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t1.pyc')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE)
 
             cat = processor.Cataloger()
 
-            six.assertCountEqual(self, os.listdir(os.getcwd()), [defaults.DEFAULT_CATALOG_FILE, 't1.py', 't2.py', 't1.pyc'])
+            self.assertCountEqual( os.listdir(os.getcwd()), [defaults.DEFAULT_CATALOG_FILE, 't1.py', 't2.py', 't1.pyc'])
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py']})
+        self.assertCountEqual(dir,{'.': ['t1.py', 't2.py']})
         self.assertEqual(len(cat.excluded_files), 1) # catalog.cat isn't counted
 
     def test_020_002_WalkFlatDirectoryMultipleExclusions(self):
@@ -341,17 +332,17 @@ class TestWalk(unittest.TestCase):
         with Patcher() as patcher:
             os.chdir('/tmp')
             cat = processor.Cataloger()
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t1.pyc')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('t2.pyc')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t1.pyc')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('t2.pyc')
 
-            six.assertCountEqual(self,os.listdir(os.getcwd()),['t1.py','t2.py','t1.pyc','t2.pyc'])
+            self.assertCountEqual(os.listdir(os.getcwd()),['t1.py','t2.py','t1.pyc','t2.pyc'])
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-            six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py']})
+            self.assertCountEqual(dir,{'.': ['t1.py', 't2.py']})
             self.assertEqual(len(cat.excluded_files), 2)
 
     def test_020_010_Walk2DeepMultipleExclusions(self):
@@ -363,21 +354,21 @@ class TestWalk(unittest.TestCase):
 
             cat = processor.Cataloger()
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('t1.pyc')
-            patcher.fs.CreateFile('t2.pyc')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('t1.pyc')
+            patcher.fs.create_file('t2.pyc')
 
-            patcher.fs.CreateFile('test/test.py')
-            patcher.fs.CreateFile('test/test.pyc')
+            patcher.fs.create_file('test/test.py')
+            patcher.fs.create_file('test/test.pyc')
 
-            six.assertCountEqual(self,os.listdir(os.getcwd()),['test', 't1.py','t2.py','t1.pyc','t2.pyc'])
-            six.assertCountEqual(self,os.listdir('/tmp/test'),['test.py','test.pyc'])
+            self.assertCountEqual(os.listdir(os.getcwd()),['test', 't1.py','t2.py','t1.pyc','t2.pyc'])
+            self.assertCountEqual(os.listdir('/tmp/test'),['test.py','test.pyc'])
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['test.py']})
+        self.assertCountEqual(dir,{'.': ['t1.py', 't2.py'],'test':['test.py']})
         self.assertEqual(len(cat.excluded_files), 3)
 
     def test_020_020_WalkExcludedDirectories(self):
@@ -390,20 +381,20 @@ class TestWalk(unittest.TestCase):
 
             cat = processor.Cataloger()
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/test.py')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/test.py')
 
             for d in defaults.DEFAULT_IGNOREDIRECTORY:
-                patcher.fs.CreateDirectory(os.path.join('/tmp',d))
+                patcher.fs.create_dir(os.path.join('/tmp',d))
 
-            six.assertCountEqual(self,os.listdir(os.getcwd()), ['test', 't1.py','t2.py'] + list(defaults.DEFAULT_IGNOREDIRECTORY) )
-            six.assertCountEqual(self,os.listdir('/tmp/test'),['test.py'])
+            self.assertCountEqual(os.listdir(os.getcwd()), ['test', 't1.py','t2.py'] + list(defaults.DEFAULT_IGNOREDIRECTORY) )
+            self.assertCountEqual(os.listdir('/tmp/test'),['test.py'])
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['test.py']})
+        self.assertCountEqual(dir,{'.': ['t1.py', 't2.py'],'test':['test.py']})
         self.assertEqual(len(cat.excluded_files), 0)
 
     def test_020_050_single_exclude_filter_no_match(self):
@@ -415,15 +406,15 @@ class TestWalk(unittest.TestCase):
 
             cat = processor.Cataloger(exclude_filter=['*wibble*'])
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/test.py')
-            patcher.fs.CreateFile('test/flump/test.py')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/test.py')
+            patcher.fs.create_file('test/flump/test.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['test.py'], 'test/flump':['test.py']})
+        self.assertCountEqual(dir,{'.': ['t1.py', 't2.py'],'test':['test.py'], 'test/flump':['test.py']})
         self.assertEqual(len(cat.excluded_files), 0)
 
     def test_020_051_single_exclude_filter_match_file(self):
@@ -435,15 +426,15 @@ class TestWalk(unittest.TestCase):
 
             cat = processor.Cataloger(exclude_filter=['*/tike.py'])
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/tike.py')
-            patcher.fs.CreateFile('test/flump/test.py')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/tike.py')
+            patcher.fs.create_file('test/flump/test.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'], 'test/flump':['test.py']})
+        self.assertCountEqual(dir,{'.': ['t1.py', 't2.py'], 'test/flump':['test.py']})
         self.assertEqual(len(cat.excluded_files), 1)
 
     def test_020_052_single_exclude_filter_match_directory(self):
@@ -455,15 +446,15 @@ class TestWalk(unittest.TestCase):
 
             cat = processor.Cataloger(exclude_filter=['test/flump/*'])
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/t1.py')
-            patcher.fs.CreateFile('test/flump/test.py')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/t1.py')
+            patcher.fs.create_file('test/flump/test.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['t1.py']})
+        self.assertCountEqual(dir,{'.': ['t1.py', 't2.py'],'test':['t1.py']})
         self.assertEqual(len(cat.excluded_files), 1)
 
     def test_020_054_multiple_exclude_filters_no_matches(self):
@@ -475,14 +466,14 @@ class TestWalk(unittest.TestCase):
 
             cat = processor.Cataloger(exclude_filter=['*wibble*', '*wobble*'])
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/t1.py')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/t1.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['t1.py']})
+        self.assertCountEqual(dir,{'.': ['t1.py', 't2.py'],'test':['t1.py']})
         self.assertEqual(len(cat.excluded_files), 0)
 
     def test_020_056_multiple_exclude_filters_one_match(self):
@@ -494,15 +485,15 @@ class TestWalk(unittest.TestCase):
 
             cat = processor.Cataloger(exclude_filter=['*wibble*', '*/a?.*'])
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/a1.py')
-            patcher.fs.CreateFile('test/a3a.py')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/a1.py')
+            patcher.fs.create_file('test/a3a.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['a3a.py']})
+        self.assertCountEqual(dir,{'.': ['t1.py', 't2.py'],'test':['a3a.py']})
         self.assertEqual(len(cat.excluded_files), 1)
 
     def test_020_058_multiple_exclude_filters_multiple_match(self):
@@ -514,16 +505,16 @@ class TestWalk(unittest.TestCase):
 
             cat = processor.Cataloger(exclude_filter=['*wibble*', '*/a?.*'])
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/a1.py')
-            patcher.fs.CreateFile('test/a2.py')
-            patcher.fs.CreateFile('test/a3a.py')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/a1.py')
+            patcher.fs.create_file('test/a2.py')
+            patcher.fs.create_file('test/a3a.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['a3a.py']})
+        self.assertCountEqual(dir,{'.': ['t1.py', 't2.py'],'test':['a3a.py']})
         self.assertEqual(len(cat.excluded_files), 2)
 
 
@@ -536,14 +527,14 @@ class TestWalk(unittest.TestCase):
 
             cat = processor.Cataloger(include_filter=['*wibble*'])
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/test.py')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/test.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{})
+        self.assertCountEqual(dir,{})
         self.assertEqual(len(cat.excluded_files), 3)
 
     def test_020_061_single_include_filter_match_file(self):
@@ -553,16 +544,16 @@ class TestWalk(unittest.TestCase):
         with Patcher() as patcher:
             os.chdir('/tmp')
 
-            cat = processor.Cataloger(include_filter=['*/tike.py'])
+            cat = processor.Cataloger(include_filter=['*tike.py'])
 
-            patcher.fs.CreateFile('tike.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/tike.py')
+            patcher.fs.create_file('tike.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/tike.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['tike.py'],'test':['tike.py']})
+        self.assertCountEqual(dir,{'.': ['tike.py'],'test':['tike.py']})
         self.assertEqual(len(cat.excluded_files), 1)
 
     def test_020_062_single_include_filter_match_directory(self):
@@ -574,15 +565,15 @@ class TestWalk(unittest.TestCase):
 
             cat = processor.Cataloger(include_filter=['test/*'])
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/t1.py')
-            patcher.fs.CreateFile('test/content/t1.py')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/t1.py')
+            patcher.fs.create_file('test/content/t1.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'test':['t1.py'], 'test/content':['t1.py']})
+        self.assertCountEqual(dir,{'test':['t1.py'], 'test/content':['t1.py']})
         self.assertEqual(len(cat.excluded_files), 2)
 
     def test_020_064_multiple_include_filters_no_matches(self):
@@ -594,13 +585,13 @@ class TestWalk(unittest.TestCase):
 
             cat = processor.Cataloger(include_filter=['*wibble*', '*wobble*'])
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/t1.py')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/t1.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
-        six.assertCountEqual(self,dir,{})
+        self.assertCountEqual(dir,{})
         self.assertEqual(len(cat.excluded_files), 3)
 
     def test_020_066_multiple_include_filters_one_match(self):
@@ -612,39 +603,39 @@ class TestWalk(unittest.TestCase):
 
             cat = processor.Cataloger(include_filter=['*wibble*', '*/a?.*'])
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('a1.py')
-            patcher.fs.CreateFile('test/a1.py')
-            patcher.fs.CreateFile('test/a3a.py')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('a1.py')
+            patcher.fs.create_file('test/a1.py')
+            patcher.fs.create_file('test/a3a.py')
+            patcher.fs.create_file('test/b3b.py')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.':['a1.py'],'test':['a1.py']})
-        self.assertEqual(len(cat.excluded_files), 3)
+        self.assertCountEqual(dir,{'test':['a1.py']})
+        self.assertEqual(len(cat.excluded_files), 5)
 
     def test_020_068_multiple_include_filters_multiple_match(self):
-        """Root which is different from cwd
-        """
+        """Ensure multiple include filters work as expected - files only listed once"""
         dir = {}
 
         with Patcher() as patcher:
             os.chdir('/tmp')
 
-            cat = processor.Cataloger(include_filter=['test/*.*', '*/t?.*'])
+            cat = processor.Cataloger(include_filter=['test/*.*', '*/t?.*', 't?.*'])
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/a1.py')
-            patcher.fs.CreateFile('test/a2.py')
-            patcher.fs.CreateFile('test/a3a.py')
-            patcher.fs.CreateFile('test/t2.txt')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/a1.py')
+            patcher.fs.create_file('test/a2.py')
+            patcher.fs.create_file('test/a3a.py')
+            patcher.fs.create_file('test/t2.txt')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.': ['t1.py', 't2.py'],'test':['a1.py', 'a2.py','a3a.py','t2.txt']})
+        self.assertCountEqual(dir,{'.': ['t1.py', 't2.py'],'test':['a1.py', 'a2.py','a3a.py','t2.txt']})
         self.assertEqual(len(cat.excluded_files), 0)
 
     def test_020_070_walk_non_default_root(self):
@@ -656,19 +647,19 @@ class TestWalk(unittest.TestCase):
             os.chdir('/tmp')
 
 
-            patcher.fs.CreateFile('t1.py')
-            patcher.fs.CreateFile('t2.py')
-            patcher.fs.CreateFile('test/a1.py')
-            patcher.fs.CreateFile('test/a2.py')
-            patcher.fs.CreateFile('test/a3a.py')
-            patcher.fs.CreateFile('test/t2.txt')
+            patcher.fs.create_file('t1.py')
+            patcher.fs.create_file('t2.py')
+            patcher.fs.create_file('test/a1.py')
+            patcher.fs.create_file('test/a2.py')
+            patcher.fs.create_file('test/a3a.py')
+            patcher.fs.create_file('test/t2.txt')
 
             cat = processor.Cataloger(root='test')
 
             for directory, files in cat.walk():
                 dir[directory] = files
 
-        six.assertCountEqual(self,dir,{'.':['a1.py', 'a2.py','a3a.py','t2.txt']})
+        self.assertCountEqual(dir,{'.':['a1.py', 'a2.py','a3a.py','t2.txt']})
         self.assertEqual(len(cat.excluded_files), 0)
 
 class HelperFunctions(unittest.TestCase):
@@ -683,7 +674,7 @@ class HelperFunctions(unittest.TestCase):
 
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile('/tmp/catalog.cat', contents="""a.py\t889898aa898a1
+            patcher.fs.create_file('/tmp/catalog.cat', contents="""a.py\t889898aa898a1
 b.py\t889898aa898a2
 c.py\t889898aa898a3
 sub/a1.py\t889898aa898a4""")
@@ -701,7 +692,7 @@ sub/a1.py\t889898aa898a4""")
 
         with Patcher() as patcher:
             os.chdir('/tmp')
-            with six.assertRaisesRegex(self, processor.CatalogError, r'No such file or directory'):
+            with self.assertRaisesRegex( processor.CatalogError, r'No such file or directory'):
                 cat = processor.Cataloger(action='check')
 
     def test_030_003_load_catalog_no_permission_read(self):
@@ -709,10 +700,10 @@ sub/a1.py\t889898aa898a4""")
 
         with Patcher() as patcher:
             os.chdir('/tmp')
-            cat = patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents='')
+            cat = patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents='')
             os.chmod('/tmp/catalog.cat', mode=int('077',8))
 
-            with six.assertRaisesRegex(self, processor.CatalogError, r'Permission denied'):
+            with self.assertRaisesRegex( processor.CatalogError, r'Permission denied'):
                 cat = processor.Cataloger(action='check')
 
     def test_030_010_get_signature_from_catalog(self):
@@ -720,7 +711,7 @@ sub/a1.py\t889898aa898a4""")
 
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""a.py\t889898aa898a1
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""a.py\t889898aa898a1
 b.py\t889898aa898a2
 c.py\t889898aa898a3
 sub/a1.py\t889898aa898a4""")
@@ -739,7 +730,7 @@ sub/a1.py\t889898aa898a4""")
 
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""
 a.py\t889898aa898a1
 
 b.py\t889898aa898a2
@@ -765,8 +756,8 @@ sub/a1.py\t889898aa898a4""")
 
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents='')
-            with six.assertRaisesRegex(self, processor.CatalogError, 'Empty catalog'):
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents='')
+            with self.assertRaisesRegex( processor.CatalogError, 'Empty catalog'):
                 cat = processor.Cataloger(
                     catalog='/tmp/catalog.cat', action='check')
 
@@ -775,11 +766,11 @@ sub/a1.py\t889898aa898a4""")
 
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""
 a.py\t889898aa898a
 b.py 889898aa898a
 """)
-            with six.assertRaisesRegex(self, processor.CatalogError, 'Invalid catalog format - missing tab on line 2'):
+            with self.assertRaisesRegex( processor.CatalogError, 'Invalid catalog format - missing tab on line 2'):
                 cat = processor.Cataloger(
                     catalog='/tmp/catalog.cat', action='check')
 
@@ -788,11 +779,11 @@ b.py 889898aa898a
 
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""
 a.py\tWibbleZibble 
 b.py\t889898aa898a
 """)
-            with six.assertRaisesRegex(self, processor.CatalogError,
+            with self.assertRaisesRegex( processor.CatalogError,
                                        'Invalid catalog format - invalid signature on line 1'):
                 cat = processor.Cataloger(
                     catalog='/tmp/catalog.cat', action='check')
@@ -801,7 +792,7 @@ b.py\t889898aa898a
         """functionality of record_extra method"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""
             a.py\t889898aa898a 
             b.py\t889898aa898a
             """)
@@ -810,7 +801,7 @@ b.py\t889898aa898a
             cat.record_extra('./y.py')
             cat.record_extra('./z.py')
 
-        six.assertCountEqual(self,cat.extra_files,['y.py','z.py'])
+        self.assertCountEqual(cat.extra_files,['y.py','z.py'])
         self.assertEqual(cat.extension_counts, {'.py':2})
 
     def test_030_021_record_mismatch(self):
@@ -818,7 +809,7 @@ b.py\t889898aa898a
 
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""
             a.py\t889898aa898a 
             b.py\t889898aa898a
             """)
@@ -827,14 +818,14 @@ b.py\t889898aa898a
             cat.record_mismatch('./a.py')
             cat.record_mismatch('./c.py')
 
-        six.assertCountEqual(self,cat.mismatched_files,['a.py','c.py'])
+        self.assertCountEqual(cat.mismatched_files,['a.py','c.py'])
         self.assertEqual(cat.extension_counts, {'.py':2})
 
     def test_030_022_record_missing(self):
         """functionality of record_missing method"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""
             a.py\t889898aa898a 
             b.py\t889898aa898a
             test/c.py\t7878abbabba
@@ -844,7 +835,7 @@ b.py\t889898aa898a
             cat.record_missing('./a.py')
             cat.record_missing('test/c.py')
 
-        six.assertCountEqual(self,cat.missing_files,['a.py','test/c.py'])
+        self.assertCountEqual(cat.missing_files,['a.py','test/c.py'])
         self.assertEqual(cat.extension_counts, {'.py':2})
 
     def test_030_040_catalog_write(self):
@@ -876,7 +867,7 @@ b.py\t889898aa898a
 
         with patch('cataloger.processor.open', mock_open()) as m:
             m.side_effect = IOError(errno.EISDIR,'Is a directory')
-            with six.assertRaisesRegex(self, processor.CatalogError,
+            with self.assertRaisesRegex( processor.CatalogError,
                     r'Error opening/writing catalog file : \'catalog.cat\' - \[Errno 21\] Is a directory'):
                 cat.write_catalog()
             m.assert_has_calls([call(defaults.DEFAULT_CATALOG_FILE, 'w')], any_order=True)
@@ -890,7 +881,7 @@ b.py\t889898aa898a
 
         with patch('cataloger.processor.open', mock_open()) as m:
             m.return_value.write.side_effect = IOError(errno.ENOSPC,'The disk is full')
-            with six.assertRaisesRegex(self, processor.CatalogError,
+            with self.assertRaisesRegex( processor.CatalogError,
                     r'Error opening/writing catalog file : \'catalog.cat\' - \[Errno 28\] The disk is full'):
                 cat.write_catalog()
 
@@ -903,20 +894,20 @@ b.py\t889898aa898a
         """Test get_non_processed helper function"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""a.py\t787908798d
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""a.py\t787908798d
         b.py\t787787ef7e
         c.py\t7898798acd
         test/d.py\t7979abbde""")
             cat = processor.Cataloger(action='check')
             cat.record_missing('./b.py')
             self.assertEqual([f for f in cat.get_non_processed('test')],['d.py'])
-            six.assertCountEqual(self, [f for f in cat.get_non_processed('.')],['a.py','c.py'])
+            self.assertCountEqual( [f for f in cat.get_non_processed('.')],['a.py','c.py'])
 
     def test_030_060_is_directory_in_catalog(self):
         """Test is_directory_in_catalog helper function"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""a.py\t787908798d
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""a.py\t787908798d
         b.py\t787787ef7e
         c.py\t7898798acd
         test/d.py\t7979abbde""")
@@ -928,7 +919,7 @@ b.py\t889898aa898a
         """Test is_file_in_catalog helper function"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""a.py\t787908798d
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""a.py\t787908798d
         b.py\t787787ef7e
         c.py\t7898798acd
         test/d.py\t7979abbde""")
@@ -949,10 +940,10 @@ class FinalReport(unittest.TestCase):
 
     def test_040_000_check_missing(self):
         """Test that missing files are reported correctly in the final report"""
-        output = six.StringIO()
+        output = StringIO()
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""
         a.py\t3765aaababba 
         b.py\t889898aa898a
         """)
@@ -972,10 +963,10 @@ class FinalReport(unittest.TestCase):
 
     def test_040_001_check_extra(self):
         """Test that extra files are reported correctly in the final report"""
-        output = six.StringIO()
+        output = StringIO()
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""
         a.py\t3765aaababba 
         b.py\t889898aa898a
         """)
@@ -994,10 +985,10 @@ class FinalReport(unittest.TestCase):
 
     def test_040_003_check_mimatched(self):
         """Test that mismatched files are reported correctly in the final report"""
-        output = six.StringIO()
+        output = StringIO()
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CATALOG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CATALOG_FILE, contents="""
         a.py\t3765aaababba 
         b.py\t889898aa898a
         """)
@@ -1026,7 +1017,7 @@ class TestCatalogConfig(unittest.TestCase):
         """Test that the catalog section with a catalog= line is captured correctly"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [catalog]
     catalog=Catalog.mft
         """)
@@ -1035,13 +1026,13 @@ class TestCatalogConfig(unittest.TestCase):
             self.assertEqual(cat.catalog_file_name,'Catalog.mft')
             self.assertEqual(cat._hash, 'sha224')
             self.assertEqual(cat._root, '.')
-            six.assertCountEqual(self, cat._extensions, defaults.DEFAULT_EXTENSIONS)
+            self.assertCountEqual( cat._extensions, defaults.DEFAULT_EXTENSIONS)
 
     def test_050_001_hash_line_present(self):
         """Test that the catalog section with a hash= line is captured correctly"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [catalog]
     hash=sha1
         """)
@@ -1049,13 +1040,13 @@ class TestCatalogConfig(unittest.TestCase):
             self.assertEqual(cat.catalog_file_name, defaults.DEFAULT_CATALOG_FILE)
             self.assertEqual(cat._hash, 'sha1')
             self.assertEqual(cat._root, '.')
-            six.assertCountEqual(self, cat._extensions, defaults.DEFAULT_EXTENSIONS)
+            self.assertCountEqual( cat._extensions, defaults.DEFAULT_EXTENSIONS)
 
     def test_050_001_root_line_present(self):
         """Test that the catalog section with a root= line is captured correctly"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [catalog]
     root=src
         """)
@@ -1063,35 +1054,35 @@ class TestCatalogConfig(unittest.TestCase):
             self.assertEqual(cat.catalog_file_name, defaults.DEFAULT_CATALOG_FILE)
             self.assertEqual(cat._hash, 'sha224')
             self.assertEqual(cat._root, 'src')
-            six.assertCountEqual(self, cat._extensions, defaults.DEFAULT_EXTENSIONS)
+            self.assertCountEqual( cat._extensions, defaults.DEFAULT_EXTENSIONS)
 
     def test_050_010_invalid_hash(self):
         """Test that the catalog section with an invalid hash value is detected"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [catalog]
     hash = gibberish
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value for hash : \'hash = gibberish\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid value for hash : \'hash = gibberish\' on line 2'):
                 cat = processor.Cataloger()
 
     def test_050_010_invalid_option(self):
         """Test that the catalog section with an invalid option name"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [catalog]
     extension=.py
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid config line in section \[catalog\] : \'extension=.py\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid config line in section \[catalog\] : \'extension=.py\' on line 2'):
                 cat = processor.Cataloger()
 
     def test_050_020_comment_and_blank(self):
         """Test that the catalog section handles blank lines and comments"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         # Define the general catalog data
         [catalog]
         catalog=Catalog.man
@@ -1117,95 +1108,95 @@ class TestExtensionConfig(unittest.TestCase):
         """Test that the extension section with an = operator is correct"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [extensions]
     =.py,.html,.js
         """)
             cat = processor.Cataloger()
-            six.assertCountEqual(self, cat._extensions, ['.py','.html','.js'])
+            self.assertCountEqual( cat._extensions, ['.py','.html','.js'])
 
     def test_050_101_minus(self):
         """Test that the extension section with an - operator is correct"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [extensions]
     - .py,.html,.js
         """)
             cat = processor.Cataloger()
-            six.assertCountEqual(self, cat._extensions, defaults.DEFAULT_EXTENSIONS - {'.py','.html','.js'} )
+            self.assertCountEqual( cat._extensions, defaults.DEFAULT_EXTENSIONS - {'.py','.html','.js'} )
 
     def test_050_102_plus(self):
         """Test that the extension section with an + operator is correct"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [extensions]
     + .jsx, .cfg, .com
         """)
             cat = processor.Cataloger()
-            six.assertCountEqual(self, cat._extensions, defaults.DEFAULT_EXTENSIONS | {'.jsx', '.cfg', '.com'})
+            self.assertCountEqual( cat._extensions, defaults.DEFAULT_EXTENSIONS | {'.jsx', '.cfg', '.com'})
 
     def test_050_110_invalid_operator(self):
         """Test that the extension section with an invalid operator is correctly detected"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [extensions]
     * .jsx, .cfg, .com
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid operator in \[extension\] section : \'\* \.jsx, \.cfg, \.com\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid operator in \[extension\] section : \'\* \.jsx, \.cfg, \.com\' on line 2'):
                 cat = processor.Cataloger()
 
     def test_050_115_invalid_extension_missing_dot(self):
         """Test that the extension section with an extension missing a dot"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [extensions]
     + .jsx, .cfg, com
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in \[extension\] section : \'\+ \.jsx, \.cfg, com\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid value in \[extension\] section : \'\+ \.jsx, \.cfg, com\' on line 2'):
                 cat = processor.Cataloger()
 
     def test_050_115_invalid_extensions_null_string(self):
         """Test that the extension section with an null string extension"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [extensions]
     + .jsx, , .com
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in \[extension\] section : \'\+ \.jsx, , \.com\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid value in \[extension\] section : \'\+ \.jsx, , \.com\' on line 2'):
                 cat = processor.Cataloger()
 
     def test_050_115_invalid_extensions_dot_only(self):
         """Test that the extension section with an extension which is just a dot"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [extensions]
     + .jsx, . , .com
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in \[extension\] section : \'\+ \.jsx, \. , \.com\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid value in \[extension\] section : \'\+ \.jsx, \. , \.com\' on line 2'):
                 cat = processor.Cataloger()
 
     def test_050_120_empty_list_equal(self):
         """Test that a single equal in the extensions area sets the list empty"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [extensions]
     =
         """)
-            with six.assertRaisesRegex(self, processor.CatalogError, r'No file extensions given to catalogue or check'):
+            with self.assertRaisesRegex( processor.CatalogError, r'No file extensions given to catalogue or check'):
                 cat = processor.Cataloger()
 
     def test_050_122_empty_list_equal_with_and(self):
         """Test that a single equal in the extensions area sets the list empty"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [extensions]
     =
     + .py
@@ -1217,22 +1208,22 @@ class TestExtensionConfig(unittest.TestCase):
         """Test that the a single + is errored"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [extensions]
     +
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in \[extension\] section : \'\+\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid value in \[extension\] section : \'\+\' on line 2'):
                 cat = processor.Cataloger()
 
     def test_050_126_empty_list_minus(self):
         """Test that a single - is errored"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [extensions]
     -
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in \[extension\] section : \'\-\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid value in \[extension\] section : \'\-\' on line 2'):
                 cat = processor.Cataloger()
 
 class TestDirectoryConfig(unittest.TestCase):
@@ -1246,62 +1237,62 @@ class TestDirectoryConfig(unittest.TestCase):
         """Test that the directories section with an = operator is correct"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [directories]
     = docs, src, coverage
         """)
             cat = processor.Cataloger()
-            six.assertCountEqual(self, cat._ignore_directories, {'docs', 'src', 'coverage'} )
+            self.assertCountEqual( cat._ignore_directories, {'docs', 'src', 'coverage'} )
 
     def test_050_201_minus(self):
         """Test that the directories section with an - operator is correct"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [directories]
     - static, htmlcov, docs
         """)
             cat = processor.Cataloger()
-            six.assertCountEqual(self, cat._ignore_directories, defaults.DEFAULT_IGNOREDIRECTORY - {'static', 'htmlcov', 'docs'} )
+            self.assertCountEqual( cat._ignore_directories, defaults.DEFAULT_IGNOREDIRECTORY - {'static', 'htmlcov', 'docs'} )
 
     def test_050_202_plus(self):
         """Test that the directories section with an + operator is correct"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [directories]
     + build, dist
         """)
             cat = processor.Cataloger()
-            six.assertCountEqual(self, cat._ignore_directories, defaults.DEFAULT_IGNOREDIRECTORY | {'build', 'dist'} )
+            self.assertCountEqual( cat._ignore_directories, defaults.DEFAULT_IGNOREDIRECTORY | {'build', 'dist'} )
 
     def test_050_210_invalid_operator(self):
         """Test that the directories section with an invalid operator is correctly detected"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [directories]
     * build, dist
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid operator in \[directories\] section : \'\* build, dist\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid operator in \[directories\] section : \'\* build, dist\' on line 2'):
                 cat = processor.Cataloger()
 
     def test_050_215_null_string(self):
         """Test that the directories section with an null string directories"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [directories]
     + build, , dist
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in \[directories\] section : \'\+ build, , dist\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid value in \[directories\] section : \'\+ build, , dist\' on line 2'):
                 cat = processor.Cataloger()
 
     def test_050_216_empty_list(self):
         """directories section with = and no value list"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [directories]
     =
         """)
@@ -1313,22 +1304,22 @@ class TestDirectoryConfig(unittest.TestCase):
         """directories section with + and no value list"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [directories]
     +
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in \[directories\] section : \'\+\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid value in \[directories\] section : \'\+\' on line 2'):
                 cat = processor.Cataloger()
 
     def test_050_225_empty_list_minus(self):
         """directories section with - and no value list"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [directories]
     -
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in \[directories\] section : \'\-\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid value in \[directories\] section : \'\-\' on line 2'):
                 cat = processor.Cataloger()
 
 class TestFilterConfig(unittest.TestCase):
@@ -1342,33 +1333,33 @@ class TestFilterConfig(unittest.TestCase):
         """Test that the filters section with a includ = line"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [filters]
     include = *test*, splat*, blah/*
         """)
             cat = processor.Cataloger()
-            six.assertCountEqual(self,  cat._include_filter, ['*test*','splat*','blah/*'])
+            self.assertCountEqual(  cat._include_filter, ['*test*','splat*','blah/*'])
 
     def test_050_301_exclude_line_present(self):
         """Test that the filters section with a exclude = line"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [filters]
     exclude = *test*, splat*, blah/*
         """)
             cat = processor.Cataloger()
-            six.assertCountEqual(self,  cat._exclude_filter, ['*test*','splat*','blah/*'])
+            self.assertCountEqual(  cat._exclude_filter, ['*test*','splat*','blah/*'])
 
     def test_050_310_invalid_option(self):
         """Test that the filters section with a invalid option"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
     [filters]
     blah = gibberish
         """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid config line in section \[filters\] : \'blah = gibberish\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid config line in section \[filters\] : \'blah = gibberish\' on line 2'):
                 cat = processor.Cataloger()
 
 class TestReportsConfig(unittest.TestCase):
@@ -1382,7 +1373,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with excluded = True"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         excluded = true
             """)
@@ -1393,7 +1384,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with excluded = yes"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         excluded = yes
             """)
@@ -1404,7 +1395,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with excluded = no"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         excluded = no
             """)
@@ -1415,7 +1406,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with excluded = false"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         excluded = false
             """)
@@ -1426,7 +1417,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with mismatch = True"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         mismatch = true
             """)
@@ -1437,7 +1428,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with mismatch = yes"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         mismatch = yes
             """)
@@ -1448,7 +1439,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with mismatch = no"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         mismatch = no
             """)
@@ -1459,7 +1450,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with mismatch = false"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         mismatch = false
             """)
@@ -1470,7 +1461,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with missing = true"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         missing = true
             """)
@@ -1481,7 +1472,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with missing = yes"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         missing = yes
             """)
@@ -1492,7 +1483,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with missing = no"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         missing = no
             """)
@@ -1503,7 +1494,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with missing = false"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         missing = false
             """)
@@ -1514,7 +1505,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with extra = true"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         extra = true
             """)
@@ -1525,7 +1516,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with extra = yes"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         extra = yes
             """)
@@ -1536,7 +1527,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with extra = no"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         extra = no
             """)
@@ -1547,7 +1538,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with extra = false"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         extra = false
             """)
@@ -1558,7 +1549,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with extension = true"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         extension = true
             """)
@@ -1569,7 +1560,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with extension = yes"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         extension = yes
             """)
@@ -1580,7 +1571,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with extension = no"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         extension = no
             """)
@@ -1591,7 +1582,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with extension = false"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         extension = false
             """)
@@ -1602,7 +1593,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with verbose = 0"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         verbose = 0
             """)
@@ -1613,7 +1604,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with verbose = 1"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         verbose = 1
             """)
@@ -1624,7 +1615,7 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with verbose = 2"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         verbose = 2
             """)
@@ -1635,22 +1626,22 @@ class TestReportsConfig(unittest.TestCase):
         """Reports section with verbose value invalid"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         verbose = wibble
             """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid value in section \[reports\] : \'verbose = wibble\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid value in section \[reports\] : \'verbose = wibble\' on line 2'):
                 cat = processor.Cataloger()
 
     def test_050_495_invalid_option(self):
         """Reports section with invalid option"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
         [reports]
         wibble=3
             """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Invalid option in section \[reports\] : \'wibble=3\' on line 2'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Invalid option in section \[reports\] : \'wibble=3\' on line 2'):
                 cat = processor.Cataloger()
 
 class ConfigSectionError(unittest.TestCase):
@@ -1664,36 +1655,36 @@ class ConfigSectionError(unittest.TestCase):
         """Invalid Section name"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
             [wibble]
             verbose = 3
                 """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Unknown section title in config file :  \'\[wibble\]\' on line 1'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Unknown section title in config file :  \'\[wibble\]\' on line 1'):
                 cat = processor.Cataloger()
 
     def test_050_501_vaild_section_repeated(self):
         """Repeated valid section name"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
             [reports]
             verbose = 2
             
             [reports]
                 """)
-            with six.assertRaisesRegex(self, processor.ConfigError, r'Repeated section title in config file :  \'\[reports\]\' on line 4'):
+            with self.assertRaisesRegex( processor.ConfigError, r'Repeated section title in config file :  \'\[reports\]\' on line 4'):
                 cat = processor.Cataloger()
 
     def test_050_501_missing_section(self):
         """directive outside section"""
         with Patcher() as patcher:
             os.chdir('/tmp')
-            patcher.fs.CreateFile(defaults.DEFAULT_CONFIG_FILE, contents="""
+            patcher.fs.create_file(defaults.DEFAULT_CONFIG_FILE, contents="""
             verbose = 3
 
             [reports]
                 """)
-            with six.assertRaisesRegex(self, processor.ConfigError,
+            with self.assertRaisesRegex( processor.ConfigError,
                                        r'Config line outside a section :  \'verbose = 3\' on line 1'):
                 cat = processor.Cataloger()
 
@@ -1716,14 +1707,14 @@ class TestApi(unittest.TestCase):
                     'src/g.pyc':u'g' * 20}
         with Patcher() as patcher:
             for file_name, data in contents.items():
-                patcher.fs.CreateFile( file_name, contents=data)
+                patcher.fs.create_file( file_name, contents=data)
             cat = commands.create_catalog()
             # Confirm that the relevant counts and lists are as expected
             self.assertTrue(os.path.exists(defaults.DEFAULT_CATALOG_FILE))
             self.assertEqual(cat.processed_count, 4)
-            six.assertCountEqual(self, cat.extension_counts,
+            self.assertCountEqual( cat.extension_counts,
                                  {'.py':2,'.html':1,'.png':1})
-            six.assertCountEqual(self, cat.excluded_files, ['src/g.pyc'])
+            self.assertCountEqual( cat.excluded_files, ['src/g.pyc'])
 
             # Confirm the contents of the catalog.cat
             with open(defaults.DEFAULT_CATALOG_FILE, 'r') as man_fp:
@@ -1747,24 +1738,25 @@ class TestApi(unittest.TestCase):
             with open(defaults.DEFAULT_CATALOG_FILE, 'w') as fp:
                 for file_name, data in contents.items():
                     fp.write(file_name + '\t' + get_sig(data) + '\n')
-                    patcher.fs.CreateFile( file_name, contents=data)
+                    patcher.fs.create_file( file_name, contents=data)
 
             # Create an extra file
-            patcher.fs.CreateFile('tests/a.py',contents='a'*20)
+            patcher.fs.create_file('tests/a.py',contents='a'*20)
 
             # Create a missing file
             os.remove('./b.py')
 
             # Create a mismatch_file
             os.remove('./a.py')
-            patcher.fs.CreateFile('./a.py', contents=contents['./a.py']*2)
+            patcher.fs.create_file('./a.py', contents=contents['./a.py']*2)
 
             cat = commands.check_catalog()
 
-            six.assertCountEqual(self, cat.extra_files, ['tests/a.py'] )
-            six.assertCountEqual(self, cat.missing_files, ['b.py'] )
-            six.assertCountEqual(self, cat.mismatched_files, ['a.py'] )
-            six.assertCountEqual(self, cat.excluded_files, ['src/g.pyc'])
+            print( cat.excluded_files)
+            self.assertCountEqual( cat.extra_files, ['tests/a.py'] )
+            self.assertCountEqual( cat.missing_files, ['b.py'] )
+            self.assertCountEqual( cat.mismatched_files, ['a.py'] )
+            self.assertCountEqual( cat.excluded_files, ['src/g.pyc'])
 
 
 class TestCli(unittest.TestCase):
@@ -1776,7 +1768,7 @@ class TestCli(unittest.TestCase):
 
     def make_files(self, fs, fs_contents):
         for file_name, data in fs_contents.items():
-            fs.CreateFile(file_name, contents=data)
+            fs.create_file(file_name, contents=data)
 
     def test_200_000_basic_create(self):
         contents = {'./a.py':'a'*20,
@@ -1788,24 +1780,22 @@ class TestCli(unittest.TestCase):
                     'src/g.pyc':'g' * 20}
 
         with Patcher() as patcher:
-            patcher.fs.add_real_paths([pkg_resources.resource_filename('cataloger','templates')])
+            patcher.fs.add_real_directory(str(files('cataloger')))
             os.chdir('/tmp')
             self.make_files(fs=patcher.fs, fs_contents = contents)
-
-
             runner = click.testing.CliRunner()
             result = runner.invoke(cli_main.main, ['create'])
 
             self.assertIsNone(result.exception)
             self.assertEqual(result.exit_code,0)
 
-            six.assertRegex(self, result.output, r'4 files processed - 1 files excluded')
-            six.assertRegex(self, result.output, r'Files processed by file types')
+            self.assertRegex( result.output, r'4 files processed - 1 files excluded')
+            self.assertRegex( result.output, r'Files processed by file types')
             m = re.search(r'Files processed by file types', result.output)
 
-            six.assertRegex(self, result.output[m.end(0):], r'\.py : 2')
-            six.assertRegex(self, result.output[m.end(0):], r'\.html : 1')
-            six.assertRegex(self, result.output[m.end(0):], r'\.png : 1')
+            self.assertRegex( result.output[m.end(0):], r'\.py : 2')
+            self.assertRegex( result.output[m.end(0):], r'\.html : 1')
+            self.assertRegex( result.output[m.end(0):], r'\.png : 1')
 
             # Confirm the contents of the catalog.cat
             with open(defaults.DEFAULT_CATALOG_FILE, 'r') as man_fp:
@@ -1822,7 +1812,7 @@ class TestCli(unittest.TestCase):
                     'src/f.png':'f' * 20}
 
         with Patcher() as patcher:
-            patcher.fs.add_real_paths([pkg_resources.resource_filename('cataloger','templates')])
+            patcher.fs.add_real_directory(files('cataloger'))
             os.chdir('/tmp')
             self.make_files(fs=patcher.fs, fs_contents = contents)
 
@@ -1837,13 +1827,13 @@ class TestCli(unittest.TestCase):
             self.assertIsNone(result.exception)
             self.assertEqual(result.exit_code,0)
 
-            six.assertRegex(self, result.output, r'4 files processed - 0 files excluded')
-            six.assertRegex(self, result.output, r'Files processed by file types')
+            self.assertRegex( result.output, r'4 files processed - 0 files excluded')
+            self.assertRegex( result.output, r'Files processed by file types')
             m = re.search(r'Files processed by file types', result.output)
 
-            six.assertRegex(self, result.output[m.end(0):], r'\.py : 2')
-            six.assertRegex(self, result.output[m.end(0):], r'\.html : 1')
-            six.assertRegex(self, result.output[m.end(0):], r'\.png : 1')
+            self.assertRegex( result.output[m.end(0):], r'\.py : 2')
+            self.assertRegex( result.output[m.end(0):], r'\.html : 1')
+            self.assertRegex( result.output[m.end(0):], r'\.png : 1')
 
 # noinspection PyMissingOrEmptyDocstring,PyUnusedLocal
 def load_tests(loader, tests=None, patterns=None,excludes=None):

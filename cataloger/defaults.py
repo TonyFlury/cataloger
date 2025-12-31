@@ -19,7 +19,7 @@ __created__ = '22 Mar 2016'
 
 import hashlib
 
-DEFAULT_EXTENSIONS = {u'.py', u'.html', u'.txt', u'.css', u'.js', u'.gif', u'.png', u'.jpg', u'.jpeg'}
+DEFAULT_EXTENSIONS = {u'.py', u'.html', u'.txt', u'.css', u'.svg', u'.js', u'.gif', u'.png', u'.jpg', u'.jpeg'}
 DEFAULT_IGNOREDIRECTORY = {u'static', u'htmlcov', u'media',u'build', u'dist', u'docs'}
 DEFAULT_CATALOG_FILE = 'catalog.cat'
 DEFAULT_CONFIG_FILE = 'catalog.cfg'

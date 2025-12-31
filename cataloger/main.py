@@ -12,9 +12,10 @@ import os
 import click
 import hashlib
 from . import defaults
-import pkg_resources
+from importlib.metadata import version
+from importlib.resources import files
 
-from cataloger import version
+from cataloger import version as version_data
 from . import commands
 
 
@@ -36,8 +37,7 @@ def validate_root(ctx, param, value):
 def get_version(ctx, param, value):
     if not value or ctx.resilient_parsing:
         return
-    click.echo('catalog : version {}'.format(
-            pkg_resources.require("cataloger")[0].version))
+    click.echo('catalog : version {}'.format(version('cataloger')))
     ctx.exit()
 
 
@@ -56,7 +56,7 @@ def validate_hash(ctx,param,value):
 
 @click.group(name=sys.argv[0])
 @click.pass_context
-@click.version_option(version=version.__version__, )
+@click.version_option(version=version_data.__version__, )
 @click.option('--version', is_flag=True, callback=get_version, expose_value=False, is_eager=True)
 @click.option('-v', '--verbose', type=click.Choice(['0', '1', '2','3']), default=defaults.DEFAULT_VERBOSE)
 
@@ -150,6 +150,7 @@ def main(ctx, **kwargs):
 @click.command('test')
 @click.pass_context
 def test(ctx,**kwargs):
+    print([i for i in files('cataloger').iterdir()])
     for k, v in ctx.obj.items():
         print(k, v)
 

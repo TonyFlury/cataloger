@@ -372,14 +372,14 @@ class Cataloger(object):
                 # Config file doesn't exist
                 if not explicit_config_file:
                     # No config file was explicity requested - case 2
-                    raise StopIteration
+                    return []
                 else:
                     # config file was explicity requested - case 3
                     click.echo(
                         'Warning : Unable to open config file \'{}\'; '
                         'continuing with defaults'.format(
                             self._config), err=True)
-                    raise StopIteration
+                    return []
             else:
                 # Some other IOError - case 4 -  permissions etc
                 six.raise_from(ConfigError(
@@ -715,7 +715,11 @@ class Cataloger(object):
         if directory == self._root and file_name == self._catalog_name:
             return False
 
+        # Combine director and file name and make relative to the root.
         full = os.path.join(directory, file_name)
+        if not os.path.isabs(full):
+            full = os.path.relpath(full, self._root)
+
 
         # Check any filters
         if self._exclude_filter:
@@ -789,9 +793,11 @@ class Cataloger(object):
                 sub_directories[:] = [sub for sub in sub_directories if
                                       sub not in self._ignore_directories]
 
+            # Which files should be processed?
             process_files = [file_name for file_name in files if
                              self._is_file_to_be_processed(directory,
                                                            file_name)]
+
             if process_files:
                 yield os.path.relpath(directory, self._root), process_files
 
@@ -877,16 +883,20 @@ class Cataloger(object):
         self._mark_processed(rel_path=rel_path, status='processed')
 
     def record_excluded(self, directory, file_name):
-        """Count the and Record the excluded files"""
+        """Count and Record the excluded files"""
 
         # Don't record the catalog file itself as being excluded
         if (self.abs_path(directory) == self.abs_path(self._root) and
                 file_name == self._catalog_name):
             return
 
+        full = os.path.join(directory, file_name)
+        if not os.path.isabs(full):
+            full = os.path.relpath(full, self._root)
+
         self._excluded_file_count += 1
 
-        self._mark_processed(os.path.join(directory, file_name), 'excluded')
+        self._mark_processed(full, 'excluded')
 
     def record_missing(self, rel_path):
         self._mark_processed(rel_path, 'missing')

@@ -18,13 +18,23 @@ import click
 
 import cataloger.processor as processor
 import cataloger.defaults as defaults
-import pkg_resources
+
+from importlib.resources import files
 
 from templatelite import Renderer, registerModifier, UnexpectedFilterArguments
 
 __version__ = "0.1"
 __author__ = 'Tony Flury : anthony.flury@btinternet.com'
 __created__ = '09 Feb 2016'
+
+def find_template_path( name):
+    content = files('cataloger').iterdir()
+    for i in content:
+
+        if 'templates' in str(i):
+            return i / name
+    else:
+        return None
 
 @click.command('check', help='Check local files against catalog')
 @click.option('-m/-M', 'report_mismatch', is_flag=True, default='report_mismatch' in defaults.DEFAULT_REPORTON,
@@ -40,7 +50,9 @@ def check(ctx, **kwargs ):
     env = check_catalog(**ctx.obj)    # Indirect method to allow for API call
 
     if env.verbose > 0:
-        report = Renderer( template_file=os.path.join(pkg_resources.resource_filename('cataloger','templates'),'final_check.tmpl'),
+        dist_files = files('cataloger')
+        print(f"Using templates from {dist_files}")
+        report = Renderer( template_file=find_template_path('final_check.tmpl'),
                            remove_indentation=False).from_context(
                                 {'processed_count':env.processed_count},
                                {'report_excluded': env.report_category('excluded'),
@@ -51,7 +63,7 @@ def check(ctx, **kwargs ):
                                 'mismatched': env.mismatched_files},
                                 {'report_missing' : env.report_category('missing'),
                                  'missing': env.missing_files},
-                                {'report_extra': env.report_category('exta'),
+                                {'report_extra': env.report_category('extra'),
                                     'extra': env.extra_files},
                                 {'verbose': env.verbose},
                                 {'by_directory': env.catalog_summary_by_directory},
@@ -114,7 +126,7 @@ def create(ctx, **kwargs):
     ctx.obj.update(kwargs)
     env = create_catalog(**ctx.obj)
 
-    report = Renderer( template_file=os.path.join(pkg_resources.resource_filename('cataloger','templates'),'final_create.tmpl'),
+    report = Renderer( template_file=find_template_path('final_create.tmpl'),
                        remove_indentation=False).from_context(
                            {'processed_count': env.processed_count},
                            {'report_excluded': env.report_category('excluded'),

@@ -22,6 +22,7 @@ from os import path
 
 from cataloger.version import __version__, __author__, __created__
 
+# Add the mock library if ever tested on a Python2 install
 if sys.version_info.major == 2:
     test_extra = ['mock']
 else:
@@ -67,7 +68,6 @@ setup(
 
             # Indicate who your project is intended for
             'Intended Audience :: Developers',
-            'Framework :: Django',
             'Topic :: Software Development :: Quality Assurance',
 
             # Pick your license as you wish (should match "license" above)
@@ -75,9 +75,7 @@ setup(
 
             # Specify the Python versions you support here. In particular, ensure
             # that you indicate whether you support Python 2, Python 3 or both.
-            'Programming Language :: Python :: 2.7',
-            'Programming Language :: Python :: 3.5',
-            'Programming Language :: Python :: 3.6',
+            'Programming Language :: Python :: 3.12',
         ],
 
         # What does your project relate to?
