@@ -56,7 +56,6 @@ def validate_hash(ctx,param,value):
 
 @click.group(name=sys.argv[0])
 @click.pass_context
-@click.version_option(version=version_data.__version__, )
 @click.option('--version', is_flag=True, callback=get_version, expose_value=False, is_eager=True)
 @click.option('-v', '--verbose', type=click.Choice(['0', '1', '2','3']), default=defaults.DEFAULT_VERBOSE)
 
@@ -73,22 +72,22 @@ def validate_hash(ctx,param,value):
 @click.option('-r', '--root', metavar='ROOT', default='.', callback=validate_root,
               help='The root directory to create the catalog from, or check the catalog against.')
 
-@click.option('-f','--exclude_filter', metavar='FILTER', multiple=True, default='',
+@click.option('-f','--exclude_filter', metavar='FILTER', multiple=True, default=[],
               help='A standard file match wildcard - files/directories are excluded if they match this value')
-@click.option('+f','--include_filter', metavar='FILTER', multiple=True, default='',
+@click.option('+f','--include_filter', metavar='FILTER', multiple=True, default=[],
               help='A standard file match wildcard - files/directories are included if they match this value')
 
-@click.option('+e', '--add_extension', multiple=True, metavar='EXTENSION', default='',
+@click.option('+e', '--add_extension', multiple=True, metavar='EXTENSION', default=[],
               help='Add an file extension to the to the set of those to be processed',
               callback=validate_extension)
-@click.option('-e', '--rm_extension', multiple=True, metavar='EXTENSION', default='',
+@click.option('-e', '--rm_extension', multiple=True, metavar='EXTENSION', default=[],
               help='remove an file extension to the set of those to be processed',
               callback=validate_extension)
 
-@click.option('+d', '--add_directory', multiple=True, metavar='DIRECTORY', default='',
+@click.option('+d', '--add_directory', multiple=True, metavar='DIRECTORY', default=[],
               help='Add a directory to the list of top level directories to be ignored',
               )
-@click.option('-d', '--rm_directory', multiple=True, metavar='DIRECTORY', default='',
+@click.option('-d', '--rm_directory', multiple=True, metavar='DIRECTORY', default=[],
               help='Remove a directory to the list of top level directories to be ignored',
               )
 

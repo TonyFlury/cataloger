@@ -13,9 +13,9 @@ Testable Statements :
     ....
 """
 
-__version__ = "1.0.0rc1"
+__version__ = "1.0.0rc5"
 __author__ = 'Tony Flury : anthony.flury@btinternet.com'
-__created__ = '30 Dec 2025'
+__created__ = '31 Dec 2025'
 
 
 

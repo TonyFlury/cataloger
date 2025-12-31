@@ -717,9 +717,15 @@ class Cataloger(object):
 
         # Combine director and file name and make relative to the root.
         full = os.path.join(directory, file_name)
+
         if not os.path.isabs(full):
             full = os.path.relpath(full, self._root)
+            abs_path = self.abs_path(full)
+        else:
+            full, abs_path = full, full
 
+        if self.is_hidden(abs_path):
+            return False
 
         # Check any filters
         if self._exclude_filter:
@@ -779,6 +785,13 @@ class Cataloger(object):
         """Return an absolute path from a relative path based from the given root"""
         return os.path.join(self._root, rel_path)
 
+    @staticmethod
+    def is_hidden(path):
+        """Return True if the given path is hidden"""
+        file_stat = os.stat(path)
+        windows_hidden = False if not hasattr(file_stat, 'st_file_attributes') else (file_stat.st_file_attributes & os.stat.FILE_ATTRIBUTE_HIDDEN)
+        return os.path.basename(path).startswith('.') or windows_hidden
+
     def walk(self):
         """ Progress through the directory tree
 
@@ -786,12 +799,17 @@ class Cataloger(object):
             yield the path of the file relative to self._root
             Used during the check and create process
         """
+
         for directory, sub_directories, files in os.walk(self._root):
 
             # Don't recurse into directories that should be ignored
             if self.abs_path(directory) == self.abs_path(self._root):
                 sub_directories[:] = [sub for sub in sub_directories if
-                                      sub not in self._ignore_directories]
+                                      sub not in self._ignore_directories and
+                                      not self.is_hidden(os.path.join(directory, sub))]
+
+            if self.is_hidden(directory):
+                continue
 
             # Which files should be processed?
             process_files = [file_name for file_name in files if
